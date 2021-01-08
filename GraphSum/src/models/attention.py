@@ -46,7 +46,10 @@ class DotProductPooling(nn.Module):
 
 
 class GraphScaledDotProductAttention(nn.Module):
-
+    """
+    :param bias: [batch_size, n_heads, len_q, len_k]
+    :param graph_attn_bias: [batch_size, n_heads, len_k, len_k]
+    """
     def __init__(self, dropout, d_k, bias, graph_attn_bias, pos_win):
         super(GraphScaledDotProductAttention, self).__init__()
         self.dropout = nn.Dropout(dropout)
@@ -55,8 +58,51 @@ class GraphScaledDotProductAttention(nn.Module):
         self.graph_attn_bias = graph_attn_bias
         self.pos_win = pos_win
 
-    def forward(self, q, k, v, mask=None):
-        attn = torch.matmul(q / (self.d_k ** 0.5), k.transpose(2, 3))
+    def forward(self, q, k, v):
+        """
+        :param q: [batch_size, n_heads, len_q, d_k]
+        :param k: [batch_size, n_heads, len_k, d_k]
+        :param v: [batch_size, n_heads, len_v, d_v]
+        """
+        scaled_q = q / (self.d_k ** 0.5)
+        # [batch_size, n_heads, len_q, len_k]
+        attn = torch.matmul(scaled_q, k.transpose(2, 3))
+        if self.bias:
+            attn += self.bias
+
+        if self.graph_attn_bias:
+            gaussian_w = (-0.5 * (self.graph_attn_bias * self.graph_attn_bias)) / ((0.5 * self.pos_win) ** 2)
+            attn += gaussian_w
+
+        weights = self.dropout(F.softmax(attn))
+
+        graph_out = torch.matmul(weights, v)
+        return graph_out, weights
+
+
+class GraphScaledDotProductAttentionWithMask(nn.Module):
+    """
+    :param bias: [batch_size, n_heads, len_q, len_k]
+    :param graph_attn_bias: [batch_size, n_heads, len_k, len_k]
+    """
+    def __init__(self, dropout, d_k, d_v, bias, graph_attn_bias, pos_win):
+        super(GraphScaledDotProductAttentionWithMask, self).__init__()
+        self.dropout = nn.Dropout(dropout)
+        self.d_k = d_k
+        self.bias = bias
+        self.graph_attn_bias = graph_attn_bias
+        self.pos_win = pos_win
+        self.fc_pos_v = nn.Linear(d_k, d_v)
+
+    def forward(self, q, k, v):
+        """
+        :param q: [batch_size, n_heads, len_q, d_k]
+        :param k: [batch_size, n_heads, len_k, d_k]
+        :param v: [batch_size, n_heads, len_v, d_v]
+        """
+        # [batch_size, n_heads, len_q, len_k]
+        scaled_q = q / (self.d_k ** 0.5)
+        attn = torch.matmul(scaled_q, k.transpose(2, 3))
         if self.bias:
             attn += self.bias
 
@@ -195,7 +241,9 @@ class MultiHeadPooling(nn.Module):
 
 
 class MultiHeadStructureAttention(nn.Module):
-
+    """
+    :param bias: [batch_size, n_heads, ]
+    """
     def __init__(self, n_heads, d_model, d_k, d_v, bias, graph_attn_bias, pos_win, dropout=0):
         super(MultiHeadStructureAttention, self).__init__()
         self.d_k = d_k
@@ -265,12 +313,12 @@ class MultiHeadHierarchicalAttention(nn.Module):
 
     def forward(self, q, k_w, v_w, k_s, v_s):
         """
-        :param q: [batch_size, seq_len, dim_embed]
-        :param k_w: [batch_size, n_blocks, n_tokens, dim_embed]
-        :param v_w: [batch_size, n_blocks, n_tokens, dim_embed]
-        :param k_s: [batch_size, n_blocks, dim_embed]
-        :param v_s: [batch_size, n_blocks, dim_embed]
-        :return:
+        :param q: [batch_size, seq_len, d_model]
+        :param k_w: [batch_size, n_blocks, n_tokens, d_model]
+        :param v_w: [batch_size, n_blocks, n_tokens, d_model]
+        :param k_s: [batch_size, n_blocks, d_model]
+        :param v_s: [batch_size, n_blocks, d_model]
+        d_model = dim_embed
         """
         d_k, d_v, n_heads = self.d_k, self.d_v, self.n_heads
         batch_size, len_q = q.size(0), q.size(1)
@@ -281,6 +329,7 @@ class MultiHeadHierarchicalAttention(nn.Module):
         k_s = self.w_ks_s(k_s).view(batch_size, len_k_s, n_heads, d_k)
         v_s = self.w_vs_s(v_s).view(batch_size, len_v_s, n_heads, d_v)
 
+        # [batch_size, n_heads, len, dim_per_head]
         q_s, k_s, v_s = q_s.transpose(1, 2), k_s.transpose(1, 2), v_s.transpose(1, 2)
 
         context_s, attns = self.graph_attn(q_s, k_s, v_s)
