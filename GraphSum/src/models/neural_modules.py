@@ -36,3 +36,15 @@ class PrePostProcessLayer(nn.Module):
                 out = self.dropout(out)
 
         return out
+
+
+def pre_post_process(d_model, process_cmd, dropout, prev_out, out):
+    for cmd in process_cmd:
+        if cmd == 'a':
+            out = out + prev_out if prev_out else out
+        elif cmd == 'n':
+            out = F.layer_norm(out, d_model, eps=1e-6)
+        elif cmd == 'd':
+            out = F.dropout(out, p=dropout)
+
+    return out
