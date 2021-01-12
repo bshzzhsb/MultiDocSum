@@ -31,7 +31,7 @@ class ScaledDotProductAttention(nn.Module):
         weights = self.dropout(F.softmax(attn, dim=-1))
         # [batch_size, n_heads, len_q, d_v]
         output = torch.matmul(weights, v)
-        return output, weights
+        return output
 
 
 class DotProductPooling(nn.Module):
@@ -269,11 +269,9 @@ class MultiHeadAttention(nn.Module):
         self.w_qs = nn.Linear(d_model, n_heads * d_k)
         self.w_ks = nn.Linear(d_model, n_heads * d_k)
         self.w_vs = nn.Linear(d_model, n_heads * d_v)
-        self.fc = nn.Linear(n_heads * d_v, d_model)
+        self.fc = nn.Linear(d_model, d_model)
 
         self.attn = ScaledDotProductAttention(dropout, d_k, bias)
-        self.dropout = nn.Dropout(dropout)
-        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
 
     def forward(self, q, k, v):
         """
@@ -283,6 +281,9 @@ class MultiHeadAttention(nn.Module):
         :return: [batch_size, len_q, d_model] [batch_size, n_heads, len_q, len_k]
         d_model = num_heads * d_k
         """
+        k = q if k is None else k
+        v = k if v is None else v
+
         d_k, d_v, n_heads = self.d_k, self.d_v, self.n_heads
         batch_size, len_q, len_k, len_v = q.size(0), q.size(1), k.size(1), v.size(1)
 
@@ -297,16 +298,14 @@ class MultiHeadAttention(nn.Module):
         q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
 
         # [batch_size, n_heads, len_q, d_v] [batch_size, n_heads, len_q, len_k]
-        out, attn = self.attn(q, k, v)
+        out = self.attn(q, k, v)
 
         # [batch_size, len_q, d_model]
         out = out.transpose(1, 2).contiguous().view(batch_size, len_q, -1)
-        out = self.dropout(self.fc(out))
-        out += residual
-        out = self.layer_norm(out)
+        out = self.fc(out)
 
-        # [batch_size, len_q, d_model] [batch_size, n_heads, len_q, len_k]
-        return out, attn
+        # [batch_size, len_q, d_model]
+        return out
 
 
 class MultiHeadPooling(nn.Module):
@@ -372,8 +371,8 @@ class MultiHeadStructureAttention(nn.Module):
     def forward(self, q, k, v):
         """
         :param q: [batch_size, len_q, d_model]
-        :parma k: [batch_size, len_k, d_model]
-        :parma v: [batch_size, len_v, d_model]
+        :param k: [batch_size, len_k, d_model]
+        :param v: [batch_size, len_v, d_model]
         d_model = num_heads * d_k = n_heads * d_v
         len_q = len_k = len_v = n_blocks
         """
