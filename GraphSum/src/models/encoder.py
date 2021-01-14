@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from attention import MultiHeadAttention, MultiHeadPooling, MultiHeadStructureAttention
-from neural_modules import PositionWiseFeedForward, PrePostProcessLayer
+from models.attention import MultiHeadAttention, MultiHeadPooling, MultiHeadStructureAttention
+from models.neural_modules import PositionWiseFeedForward, PrePostProcessLayer
 
 
 class TransformerEncoderLayer(nn.Module):
