@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -7,12 +6,20 @@ class PositionWiseFeedForward(nn.Module):
 
     def __init__(self, d_model, d_inner_hidden, d_hidden, dropout, hidden_act):
         super(PositionWiseFeedForward, self).__init__()
+        self.hidden_act = hidden_act
+
         self.fc1 = nn.Linear(d_model, d_inner_hidden)
         self.fc2 = nn.Linear(d_inner_hidden, d_hidden)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        hidden = self.dropout(self.fc1(x))
+        hidden = self.fc1(x)
+        if self.hidden_act == "relu":
+            hidden = F.relu(hidden)
+        elif self.hidden_act == 'tanh':
+            hidden = F.tanh(hidden)
+
+        hidden = self.dropout(hidden)
         out = self.fc2(hidden)
 
         return out
