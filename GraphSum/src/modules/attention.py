@@ -53,7 +53,7 @@ class DotProductPooling(nn.Module):
             product += bias_sliced.squeeze(2)
 
         # [batch_size, n_heads, len_k]
-        weights = self.dropout(F.softmax(product))
+        weights = self.dropout(F.softmax(product, dim=-1))
         # [batch_size, n_heads, len_k, d_v]
         out = v * weights.unsqueeze(-1)
         # [batch_size, n_heads, d_v]
@@ -91,7 +91,7 @@ class GraphScaledDotProductAttention(nn.Module):
             gaussian_w = (-0.5 * (graph_attn_bias * graph_attn_bias)) / ((0.5 * self.pos_win) ** 2)
             attn += gaussian_w
 
-        weights = self.dropout(F.softmax(attn))
+        weights = self.dropout(F.softmax(attn, dim=-1))
 
         # [batch_size, n_heads, len_q, d_v]
         graph_out = torch.matmul(weights, v)
@@ -135,8 +135,8 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
             # [batch_size, n_heads, len_q, d_v]
             pos_v = self.fc_pos_v(scaled_q)
             # [batch_size, n_heads, len_q, 1]
-            pos_s = self.fc_pos_s(F.tanh(pos_v))
-            pos = F.sigmoid(pos_s) * (len_k_s - 1)
+            pos_s = self.fc_pos_s(torch.tanh(pos_v))
+            pos = torch.sigmoid(pos_s) * (len_k_s - 1)
 
             # [batch_size, n_heads, len_q, 1]
             pos_up = torch.ceil(pos).to(torch.int64)
@@ -179,7 +179,7 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
             attn += gaussian_w
 
         # [batch_size, n_heads, len_q, len_k_s]
-        weights = self.dropout(F.softmax(attn))
+        weights = self.dropout(F.softmax(attn, dim=-1))
 
         # [batch_size, n_heads, len_q, dim_per_head]
         graph_out = torch.matmul(weights, v)
@@ -221,7 +221,7 @@ class ScaledDotProductAttentionWithSentenceNorm(nn.Module):
         if bias is not None:
             attn += bias
 
-        weights = F.softmax(attn)
+        weights = F.softmax(attn, dim=-1)
 
         # [batch_size, n_heads, len_q, len_k, n_tokens]
         attn_w = weights.transpose(1, 2).transpose(2, 3)

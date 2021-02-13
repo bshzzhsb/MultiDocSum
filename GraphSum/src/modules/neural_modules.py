@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -17,7 +18,7 @@ class PositionWiseFeedForward(nn.Module):
         if self.hidden_act == "relu":
             hidden = F.relu(hidden)
         elif self.hidden_act == 'tanh':
-            hidden = F.tanh(hidden)
+            hidden = torch.tanh(hidden)
 
         hidden = self.dropout(hidden)
         out = self.fc2(hidden)
