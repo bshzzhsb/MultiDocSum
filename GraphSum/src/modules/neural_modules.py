@@ -36,7 +36,7 @@ class PrePostProcessLayer(nn.Module):
     def forward(self, prev_out, out):
         for cmd in self.process_cmd:
             if cmd == 'a':
-                out = out + prev_out if prev_out else out
+                out = out + prev_out if prev_out is not None else out
             elif cmd == 'n':
                 out = self.layer_norm(out)
             elif cmd == 'd':

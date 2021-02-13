@@ -2,3 +2,9 @@
 .idea/
 
 __pycache__/
+
+# log
+*/log
+
+# tensorboard & model
+*/models

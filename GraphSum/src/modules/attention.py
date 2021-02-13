@@ -22,7 +22,7 @@ class ScaledDotProductAttention(nn.Module):
         # [batch_size, n_heads, len_q, len_k]
         attn = torch.matmul(q / (self.d_k ** 0.5), k.transpose(2, 3))
 
-        if bias:
+        if bias is not None:
             attn += bias
 
         # [batch_size, n_heads, len_q, len_k]
@@ -47,14 +47,15 @@ class DotProductPooling(nn.Module):
         """
         # [batch_size, n_heads, len_k]
         product = k.squeeze(-1)
-        if bias:
+        if bias is not None:
             # [batch_size, n_heads, 1, len_k]
             bias_sliced = bias[:, :, 0, :]
-            product += torch.squeeze(bias_sliced, dim=2)
+            product += bias_sliced.squeeze(2)
 
-        weights = self.dropout(F.softmax(k))
+        # [batch_size, n_heads, len_k]
+        weights = self.dropout(F.softmax(product))
         # [batch_size, n_heads, len_k, d_v]
-        out = torch.mul(v, weights)
+        out = v * weights.unsqueeze(-1)
         # [batch_size, n_heads, d_v]
         out = out.sum(dim=2)
 
@@ -82,10 +83,10 @@ class GraphScaledDotProductAttention(nn.Module):
         scaled_q = q / (self.d_k ** 0.5)
         # [batch_size, n_heads, len_q, len_k]
         attn = torch.matmul(scaled_q, k.transpose(2, 3))
-        if bias:
+        if bias is not None:
             attn += bias
 
-        if graph_attn_bias:
+        if graph_attn_bias is not None:
             # [batch_size, n_heads, len_q, len_k]
             gaussian_w = (-0.5 * (graph_attn_bias * graph_attn_bias)) / ((0.5 * self.pos_win) ** 2)
             attn += gaussian_w
@@ -126,10 +127,10 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
         scaled_q = q / (self.d_k ** 0.5)
         # [batch_size, n_heads, len_q, len_k_s]
         attn = torch.matmul(scaled_q, k.transpose(2, 3))
-        if bias:
+        if bias is not None:
             attn += bias
 
-        if graph_attn_bias:
+        if graph_attn_bias is not None:
             # [batch_size, n_heads, len_q, d_v]
             pos_v = self.fc_pos_v(scaled_q)
             # [batch_size, n_heads, len_q, 1]
@@ -148,7 +149,7 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
             # [batch_size, n_heads, len_q, 1]
             head_ind = head_ind.view(1, n_heads, 1, 1).expand(batch_size, -1, len_q, -1)
 
-            query_ind = torch.arange(0, 1, len_q, dtype=torch.int64)
+            query_ind = torch.arange(start=0, end=len_q, step=1, dtype=torch.int64)
             # [batch_size, n_heads, len_q, 1]
             query_ind = query_ind.view(1, 1, len_q, 1).expand(batch_size, n_heads, -1, -1)
 
@@ -163,8 +164,10 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
             graph_attn_mask = graph_attn_mask.expand(-1, -1, len_q, -1, -1)
 
             # [batch_size, n_heads, len_q, len_k_s]
-            graph_attn_mask_up = graph_attn_mask[list(pos_up_ind.T)]
-            graph_attn_mask_down = graph_attn_mask[list(pos_down_ind.T)]
+            pos_up_ind = pos_up_ind.transpose(2, 3).transpose(1, 2).transpose(0, 1)
+            graph_attn_mask_up = graph_attn_mask[pos_up_ind.numpy().tolist()]
+            pos_down_ind = pos_down_ind.transpose(2, 3).transpose(1, 2).transpose(0, 1)
+            graph_attn_mask_down = graph_attn_mask[pos_down_ind.numpy().tolist()]
 
             # [batch_size, n_heads, len_q, len_k_s]
             graph_attn_mask_select = graph_attn_mask_up * (1.0 - (pos_up.to(torch.float32) - pos)) + \
@@ -180,7 +183,7 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
         # [batch_size, n_heads, len_q, dim_per_head]
         graph_out = torch.matmul(weights, v)
         # [batch_size, len_q, d_model]
-        graph_out = graph_out.transpose(1, 2).view(batch_size, len_q, d_model)
+        graph_out = graph_out.transpose(1, 2).contiguous().view(batch_size, len_q, d_model)
         graph_out = self.fc_out(graph_out)
 
         # [batch_size, len_q, d_model] [batch_size, n_heads, len_q, len_k_s]
@@ -206,15 +209,15 @@ class ScaledDotProductAttentionWithSentenceNorm(nn.Module):
         :param attn_s: [batch_size, n_heads, len_q, n_blocks]
         :param bias: [batch_size, n_blocks, n_heads, len_q, n_tokens]
         """
-        batch_size, len_q, len_k = q.size(0), q.size(1), k.size(1)
+        batch_size, len_q, len_k = q.size(0), q.size(2), k.size(1)
         d_v, n_heads = self.d_v, self.n_heads
 
         # [batch_size, len_k, n_heads, len_q, d_k]
-        q = torch.unsqueeze(q, 1).expand(-1, len_k, -1, -1, -1)
+        q = q.unsqueeze(1).expand(-1, len_k, -1, -1, -1)
         # [batch_size, len_k, n_heads, len_q, n_tokens]
         attn = torch.matmul(q / (self.d_k ** 0.5), k.transpose(3, 4))
 
-        if bias:
+        if bias is not None:
             attn += bias
 
         weights = F.softmax(attn)
@@ -222,7 +225,7 @@ class ScaledDotProductAttentionWithSentenceNorm(nn.Module):
         # [batch_size, n_heads, len_q, len_k, n_tokens]
         attn_w = weights.transpose(1, 2).transpose(2, 3)
         # [batch_size, n_heads, len_q, len_k, n_tokens]
-        attn_w = torch.mul(attn_w, torch.unsqueeze(attn_s, -1))
+        attn_w = torch.mul(attn_w, attn_s.unsqueeze(-1))
         # [batch_size, n_heads, len_q, len_k * n_tokens]
         attn_w = attn_w.contiguous().view(batch_size, n_heads, len_q, -1)
 
@@ -234,7 +237,9 @@ class ScaledDotProductAttentionWithSentenceNorm(nn.Module):
         # [batch_size, n_heads, len_q, d_v]
         out = torch.matmul(attn_w, v_w)
         # [batch_size, len_q, n_heads * d_v]
-        out = out.transpose(1, 2).view(batch_size, len_q, -1)
+        out = out.transpose(1, 2).contiguous().view(batch_size, len_q, -1)
+
+        out = self.fc(out)
 
         # [batch_size, len_q, d_model] [batch_size, n_heads, len_q, len_k * n_tokens]
         return out, attn_w

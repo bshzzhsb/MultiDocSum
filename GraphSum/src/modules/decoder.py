@@ -123,7 +123,7 @@ class GraphDecoder(nn.Module):
         super(GraphDecoder, self).__init__()
         self.n_layers = n_layers
 
-        self.graph_encoder_layers = nn.ModuleList([
+        self.graph_decoder_layers = nn.ModuleList([
             GraphDecoderLayer(
                 n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win,
                 pre_post_process_dropout, attn_dropout, relu_dropout,
@@ -135,7 +135,7 @@ class GraphDecoder(nn.Module):
     def forward(self, dec_input, enc_words_output, enc_sents_output,
                 dec_self_attn_bias, dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,):
         for i in range(self.n_layers):
-            dec_output = self.graph_encoder_layers[i](
+            dec_output = self.graph_decoder_layers[i](
                 dec_input, enc_words_output, enc_sents_output,
                 dec_self_attn_bias, dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias
             )
