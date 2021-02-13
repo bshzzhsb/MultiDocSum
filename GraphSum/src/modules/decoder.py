@@ -74,7 +74,7 @@ class GraphDecoderLayer(nn.Module):
 
     def __init__(self, n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win,
                  pre_post_process_dropout, attn_dropout, relu_dropout,
-                 hidden_act, pre_process_cmd, post_process_cmd):
+                 hidden_act, pre_process_cmd, post_process_cmd, device):
         super(GraphDecoderLayer, self).__init__()
         self.self_attn = MultiHeadAttention(n_heads, d_model, d_k, d_v, attn_dropout)
         self.multi_head_hierarchical_attn = MultiHeadHierarchicalAttention(
@@ -82,6 +82,7 @@ class GraphDecoderLayer(nn.Module):
             d_k=d_k,
             d_v=d_v,
             d_model=d_model,
+            device=device,
             n_heads=n_heads,
             dropout=attn_dropout
         )
@@ -119,7 +120,7 @@ class GraphDecoder(nn.Module):
 
     def __init__(self, n_layers, n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win,
                  pre_post_process_dropout, attn_dropout, relu_dropout,
-                 hidden_act, pre_process_cmd, post_process_cmd):
+                 hidden_act, pre_process_cmd, post_process_cmd, device):
         super(GraphDecoder, self).__init__()
         self.n_layers = n_layers
 
@@ -127,7 +128,7 @@ class GraphDecoder(nn.Module):
             GraphDecoderLayer(
                 n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win,
                 pre_post_process_dropout, attn_dropout, relu_dropout,
-                hidden_act, pre_process_cmd, post_process_cmd
+                hidden_act, pre_process_cmd, post_process_cmd, device
             ) for i in range(n_layers)
         ])
         self.pre_process_layer = PrePostProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)

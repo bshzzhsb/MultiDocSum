@@ -100,7 +100,7 @@ class GraphScaledDotProductAttention(nn.Module):
 
 class GraphScaledDotProductAttentionWithMask(nn.Module):
 
-    def __init__(self, dropout, d_model, d_k, d_v, pos_win):
+    def __init__(self, dropout, d_model, d_k, d_v, pos_win, device):
         super(GraphScaledDotProductAttentionWithMask, self).__init__()
         self.dropout = nn.Dropout(dropout)
         self.d_k = d_k
@@ -154,9 +154,9 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
             query_ind = query_ind.view(1, 1, len_q, 1).expand(batch_size, n_heads, -1, -1)
 
             # [batch_size, n_heads, len_q, 4]
-            pos_up_ind = torch.cat((batch_ind, head_ind, query_ind, pos_up), dim=3)
+            pos_up_ind = torch.cat((batch_ind, head_ind, query_ind, pos_up), dim=3).to(self.device)
             pos_up_ind.requires_grad_(requires_grad=False)
-            pos_down_ind = torch.cat((batch_ind, head_ind, query_ind, pos_down), dim=3)
+            pos_down_ind = torch.cat((batch_ind, head_ind, query_ind, pos_down), dim=3).to(self.device)
             pos_down_ind.requires_grad_(requires_grad=False)
 
             # [batch_size, n_heads, len_q, len_k_s, len_k_s]
@@ -392,12 +392,13 @@ class MultiHeadStructureAttention(nn.Module):
 
 class MultiHeadHierarchicalAttention(nn.Module):
 
-    def __init__(self, pos_win, d_k, d_v, d_model, n_heads=1, dropout=0):
+    def __init__(self, pos_win, d_k, d_v, d_model, device, n_heads=1, dropout=0):
         super(MultiHeadHierarchicalAttention, self).__init__()
         self.d_k = d_k
         self.d_v = d_v
         self.d_model = d_model
         self.n_heads = n_heads
+        self.device = device
 
         self.w_qs_s = nn.Linear(d_model, n_heads * d_k)
         self.w_ks_s = nn.Linear(d_model, n_heads * d_k)
@@ -407,7 +408,7 @@ class MultiHeadHierarchicalAttention(nn.Module):
         self.w_vs_w = nn.Linear(d_model, n_heads * d_v)
         self.fc = nn.Linear(2 * d_model, d_model)
 
-        self.graph_attn = GraphScaledDotProductAttentionWithMask(dropout, d_model, d_k, d_v, pos_win)
+        self.graph_attn = GraphScaledDotProductAttentionWithMask(dropout, d_model, d_k, d_v, pos_win, self.device)
         self.attn_with_sent_norm = ScaledDotProductAttentionWithSentenceNorm(
             dropout, d_model, d_k, d_v, n_heads
         )

@@ -103,7 +103,8 @@ class GraphSum(nn.Module):
             relu_dropout=self.pre_post_process_dropout,
             hidden_act=self.hidden_act,
             pre_process_cmd=self.pre_process_cmd,
-            post_process_cmd=self.post_process_cmd
+            post_process_cmd=self.post_process_cmd,
+            device=device
         )
 
         self.generator_fc = nn.Linear(self.embed_size, self.vocab_size)
