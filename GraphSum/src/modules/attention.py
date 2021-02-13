@@ -166,9 +166,9 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
 
             # [batch_size, n_heads, len_q, len_k_s]
             pos_up_ind = pos_up_ind.transpose(2, 3).transpose(1, 2).transpose(0, 1)
-            graph_attn_mask_up = graph_attn_mask[pos_up_ind.numpy().tolist()]
+            graph_attn_mask_up = graph_attn_mask[list(pos_up_ind)]
             pos_down_ind = pos_down_ind.transpose(2, 3).transpose(1, 2).transpose(0, 1)
-            graph_attn_mask_down = graph_attn_mask[pos_down_ind.numpy().tolist()]
+            graph_attn_mask_down = graph_attn_mask[list(pos_down_ind)]
 
             # [batch_size, n_heads, len_q, len_k_s]
             graph_attn_mask_select = graph_attn_mask_up * (1.0 - (pos_up.to(torch.float32) - pos)) + \
