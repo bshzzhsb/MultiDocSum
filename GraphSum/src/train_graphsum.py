@@ -51,7 +51,7 @@ def train(args, device):
     test_iter = Dataloader(args, load_dataset(args, 'test', shuffle=False), symbols,
                            args.batch_size, device, shuffle=False, is_test=True)
 
-    model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], tokenizer=spm)
+    model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], tokenizer=spm, device=device)
     optim = build_optim(args, model, checkpoint)
     logger.info(model)
     trainer = build_trainer(args, device, model, symbols, vocab_size, optim, test_iter)

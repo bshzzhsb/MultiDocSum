@@ -8,7 +8,7 @@ from modules.neural_modules import PrePostProcessLayer
 
 class GraphSum(nn.Module):
 
-    def __init__(self, args, padding_idx, bos_idx, eos_idx, tokenizer):
+    def __init__(self, args, padding_idx, bos_idx, eos_idx, tokenizer, device):
         super(GraphSum, self).__init__()
         self.args = args
         self.embed_size = args.hidden_size
@@ -112,6 +112,7 @@ class GraphSum(nn.Module):
             self.generator_fc.bias = nn.Parameter(torch.zeros(self.vocab_size, dtype=torch.float32), requires_grad=True)
 
         self.generator_log_softmax = nn.LogSoftmax(dim=-1)
+        self.to(device)
 
     def encode(self, enc_input):
         src_word, src_word_pos, src_sent_pos, src_words_self_attn_bias, \
