@@ -34,7 +34,7 @@ def build_trainer(args, device, model, symbols, vocab_size, optim, test_iter):
 class Trainer(object):
 
     def __init__(self, args, model, optim, shard_size, train_loss, valid_loss,
-                 valid_iter=None, test_iter=None, report_manager=None):
+                 valid_iter=None, report_manager=None):
         self.args = args
         self.model = model
         self.train_loss = train_loss
@@ -43,7 +43,6 @@ class Trainer(object):
         self.shard_size = shard_size
         self.report_manager = report_manager
         self.valid_iter = valid_iter
-        self.test_iter = test_iter
 
     def train(self, train_iter_fct, train_steps):
         logger.info('Start training...')
@@ -74,8 +73,8 @@ class Trainer(object):
                     if self.args.do_val and self.valid_iter:
                         self.validate(self.valid_iter)
 
-                    if self.args.do_test and self.test_iter:
-                        self.validate(self.test_iter)
+                    if self.args.do_test and self.valid_iter:
+                        self.validate(self.valid_iter)
 
                 step += 1
                 if step > train_steps:
