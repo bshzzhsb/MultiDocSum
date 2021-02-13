@@ -106,6 +106,7 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
         self.d_k = d_k
         self.pos_win = pos_win
         self.d_model = d_model
+        self.device = device
 
         self.fc_pos_v = nn.Linear(d_k, d_v)
         self.fc_pos_s = nn.Linear(d_v, 1)
@@ -141,15 +142,15 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
             pos_up = torch.ceil(pos).to(torch.int64)
             pos_down = torch.floor(pos).to(torch.int64)
 
-            batch_ind = torch.arange(0, batch_size, 1, dtype=torch.int64)
+            batch_ind = torch.arange(0, batch_size, 1, dtype=torch.int64, device=self.device)
             # [batch_size, n_heads, len_q, 1]
             batch_ind = batch_ind.view(batch_size, 1, 1, 1).expand(-1, n_heads, len_q, -1)
 
-            head_ind = torch.arange(0, n_heads, 1, dtype=torch.int64)
+            head_ind = torch.arange(0, n_heads, 1, dtype=torch.int64, device=self.device)
             # [batch_size, n_heads, len_q, 1]
             head_ind = head_ind.view(1, n_heads, 1, 1).expand(batch_size, -1, len_q, -1)
 
-            query_ind = torch.arange(start=0, end=len_q, step=1, dtype=torch.int64)
+            query_ind = torch.arange(start=0, end=len_q, step=1, dtype=torch.int64, device=self.device)
             # [batch_size, n_heads, len_q, 1]
             query_ind = query_ind.view(1, 1, len_q, 1).expand(batch_size, n_heads, -1, -1)
 
