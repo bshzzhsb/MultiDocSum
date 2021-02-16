@@ -73,9 +73,6 @@ class Trainer(object):
                     if self.args.do_val and self.valid_iter:
                         self.validate(self.valid_iter)
 
-                    if self.args.do_test and self.valid_iter:
-                        self.validate(self.valid_iter)
-
                 step += 1
                 if step > train_steps:
                     break
