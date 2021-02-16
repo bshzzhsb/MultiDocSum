@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 from modules.attention import MultiHeadAttention, MultiHeadPooling, MultiHeadStructureAttention
-from modules.neural_modules import PositionWiseFeedForward, PrePostProcessLayer
+from modules.neural_modules import PositionWiseFeedForward, PreProcessLayer, PostProcessLayer
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -12,19 +12,19 @@ class TransformerEncoderLayer(nn.Module):
         super(TransformerEncoderLayer, self).__init__()
         self.pre_process_cmd = pre_process_cmd
 
-        self.pre_process_layer1 = PrePostProcessLayer(
+        self.pre_process_layer1 = PreProcessLayer(
             d_model, pre_process_cmd, pre_post_process_dropout
         )
-        self.pre_process_layer2 = PrePostProcessLayer(
+        self.pre_process_layer2 = PreProcessLayer(
             d_model, pre_process_cmd, pre_post_process_dropout
         )
-        self.pre_process_layer3 = PrePostProcessLayer(
+        self.pre_process_layer3 = PreProcessLayer(
             d_model, pre_process_cmd, pre_post_process_dropout
         )
-        self.post_process_layer1 = PrePostProcessLayer(
+        self.post_process_layer1 = PostProcessLayer(
             d_model, post_process_cmd, pre_post_process_dropout
         )
-        self.post_process_layer2 = PrePostProcessLayer(
+        self.post_process_layer2 = PostProcessLayer(
             d_model, post_process_cmd, pre_post_process_dropout
         )
         self.pos_wise_ffd = PositionWiseFeedForward(
@@ -38,15 +38,15 @@ class TransformerEncoderLayer(nn.Module):
         :param k: [batch_size, n_blocks, d_model]
         :return: [batch_size, n_blocks, d_model]
         """
-        k = self.pre_process_layer1(None, k) if k else None
+        k = self.pre_process_layer1(k) if k else None
         v = k if k else None
 
         # [batch_size, n_blocks, d_model]
-        attn_output = self.self_attn(self.pre_process_layer2(None, q), k, v, bias)
+        attn_output = self.self_attn(self.pre_process_layer2(q), k, v, bias)
         attn_output = self.post_process_layer1(q, attn_output)
 
         # [batch_size, n_blocks, d_model]
-        ffd_output = self.pos_wise_ffd(self.pre_process_layer3(None, attn_output))
+        ffd_output = self.pos_wise_ffd(self.pre_process_layer3(attn_output))
         out = self.post_process_layer2(attn_output, ffd_output)
 
         # [batch_size, n_blocks, d_model]
@@ -69,7 +69,7 @@ class TransformerEncoder(nn.Module):
                                      hidden_act, pre_process_cmd, post_process_cmd)
              for i in range(self.n_layers)]
         )
-        self.pre_process_layer = PrePostProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
+        self.pre_process_layer = PreProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
 
     def forward(self, enc_input, bias):
         """
@@ -81,7 +81,7 @@ class TransformerEncoder(nn.Module):
             enc_output = self.transformer_encoder_layers[i](enc_input, None, bias)
 
         if self.with_post_process:
-            enc_output = self.pre_process_layer(None, enc_output)
+            enc_output = self.pre_process_layer(enc_output)
 
         # [batch_size, n_blocks, d_model]
         return enc_output
@@ -96,7 +96,7 @@ class SelfAttentionPoolingLayer(nn.Module):
         self.n_blocks = n_blocks
         self.d_model = d_model
 
-        self.pre_process_layer = PrePostProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
+        self.pre_process_layer = PreProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
         self.multi_head_pooling = MultiHeadPooling(n_heads, d_model, d_v, attn_dropout)
         self.dropout = nn.Dropout(attn_dropout)
 
@@ -106,7 +106,7 @@ class SelfAttentionPoolingLayer(nn.Module):
         :param bias: [batch_size * n_blocks, n_heads, n_tokens, n_tokens]
         :return: [batch_size, n_blocks, d_model]
         """
-        key = self.pre_process_layer(None, enc_input)
+        key = self.pre_process_layer(enc_input)
 
         # [batch_size * n_blocks, d_model]
         attn_output = self.multi_head_pooling(key, key, bias)
@@ -128,10 +128,10 @@ class GraphEncoderLayer(nn.Module):
         self.multi_head_structure_attn = MultiHeadStructureAttention(
             n_heads, d_model, d_k, d_v, pos_win, attn_dropout
         )
-        self.pre_process_layer1 = PrePostProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
-        self.pre_process_layer2 = PrePostProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
-        self.post_process_layer1 = PrePostProcessLayer(d_model, post_process_cmd, pre_post_process_dropout)
-        self.post_process_layer2 = PrePostProcessLayer(d_model, post_process_cmd, pre_post_process_dropout)
+        self.pre_process_layer1 = PreProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
+        self.pre_process_layer2 = PreProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
+        self.post_process_layer1 = PostProcessLayer(d_model, post_process_cmd, pre_post_process_dropout)
+        self.post_process_layer2 = PostProcessLayer(d_model, post_process_cmd, pre_post_process_dropout)
         self.pos_wise_ffd = PositionWiseFeedForward(d_model, d_inner_hidden, d_model, relu_dropout, hidden_act)
 
     def forward(self, enc_input, bias, graph_attn_bias):
@@ -141,13 +141,13 @@ class GraphEncoderLayer(nn.Module):
         :param bias: [batch_size, n_heads, n_blocks, n_blocks]
         :param graph_attn_bias: [batch_size, n_heads, n_blocks, n_blocks]
         """
-        q = self.pre_process_layer1(None, enc_input)
+        q = self.pre_process_layer1(enc_input)
         # [batch_size, n_blocks, d_model]
         attn_output = self.multi_head_structure_attn(q, q, q, bias, graph_attn_bias)
         attn_output = self.post_process_layer1(enc_input, attn_output)
 
         # [batch_size, n_blocks, d_model]
-        ffd_output = self.pos_wise_ffd(self.pre_process_layer2(None, attn_output))
+        ffd_output = self.pos_wise_ffd(self.pre_process_layer2(attn_output))
 
         out = self.post_process_layer2(attn_output, ffd_output)
 
@@ -174,7 +174,7 @@ class GraphEncoder(nn.Module):
                 hidden_act, pre_process_cmd, post_process_cmd
             ) for i in range(n_graph_layers)]
         )
-        self.pre_process_layer = PrePostProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
+        self.pre_process_layer = PreProcessLayer(d_model, pre_process_cmd, pre_post_process_dropout)
 
     def forward(self, enc_words_input, src_words_self_attn_bias,
                 src_sents_self_attn_bias, graph_attn_bias):
@@ -193,7 +193,7 @@ class GraphEncoder(nn.Module):
             enc_output = self.graph_encoder_layers[i](enc_input, src_sents_self_attn_bias, graph_attn_bias)
             enc_input = enc_output
 
-        enc_output = self.pre_process_layer(None, enc_output)
+        enc_output = self.pre_process_layer(enc_output)
 
         # [batch_size, n_blocks, d_model]
         return enc_output

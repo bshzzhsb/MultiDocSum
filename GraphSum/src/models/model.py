@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from modules.encoder import TransformerEncoder, GraphEncoder
 from modules.decoder import GraphDecoder
-from modules.neural_modules import PrePostProcessLayer
+from modules.neural_modules import PreProcessLayer
 
 
 class GraphSum(nn.Module):
@@ -86,7 +86,7 @@ class GraphSum(nn.Module):
             post_process_cmd=self.post_process_cmd
         )
 
-        self.post_encoder = PrePostProcessLayer(
+        self.post_encoder = PreProcessLayer(
             self.d_model, self.pre_process_cmd, self.pre_post_process_dropout
         )
 
@@ -153,7 +153,7 @@ class GraphSum(nn.Module):
             enc_words_out, src_words_self_attn_bias, src_sent_self_attn_bias, graph_attn_bias
         )
 
-        enc_words_out = self.post_encoder(None, enc_words_out)
+        enc_words_out = self.post_encoder(enc_words_out)
 
         enc_words_out = enc_words_out.contiguous().view(
             -1, self.max_para_num, self.max_para_len, self.embed_size

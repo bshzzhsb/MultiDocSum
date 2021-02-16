@@ -63,6 +63,7 @@ if __name__ == '__main__':
     parser.add_argument('-log_file', default='../log/graph_sum.log', type=str, help='Path to .log')
     parser.add_argument('-mode', default='train', type=str, choices=['train', 'test'],
                         help='Run mode')
+    parser.add_argument('-do_val', default=True, type=str2bool, help='Whether to do validation while training')
     parser.add_argument('-use_cuda', default=False, type=str2bool, help='Number of gpus')
     parser.add_argument('-data_path', default='../../../data/MultiNews', type=str, help='Path to data')
     parser.add_argument('-model_path', default='../models', type=str, help='Path to save model')

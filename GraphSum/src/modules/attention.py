@@ -280,8 +280,6 @@ class MultiHeadAttention(nn.Module):
         d_k, d_v, n_heads = self.d_k, self.d_v, self.n_heads
         batch_size, len_q, len_k, len_v = q.size(0), q.size(1), k.size(1), v.size(1)
 
-        residual = q
-
         # [batch_size, len, n_heads, dim_per_head]
         q = self.w_qs(q).view(batch_size, len_q, n_heads, d_k)
         k = self.w_ks(k).view(batch_size, len_k, n_heads, d_k)

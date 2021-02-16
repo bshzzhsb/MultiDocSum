@@ -60,6 +60,7 @@ class DataBatch(object):
             device=device
         )
 
+        # [batch_size, max_para_num, n_heads, max_para_len, max_para_len]
         src_words_self_attn_bias = src_words_self_attn_bias.unsqueeze(2).unsqueeze(3) \
             .expand(-1, -1, self.n_heads, self.max_para_len, -1)
         src_words_self_attn_bias.requires_grad = False
@@ -74,6 +75,7 @@ class DataBatch(object):
         tgt_self_attn_bias = tgt_self_attn_bias.unsqueeze(1).expand(-1, self.n_heads, -1, -1)
         tgt_self_attn_bias.requires_grad = False
 
+        # [batch_size, max_para_num, n_heads, max_tgt_len, max_para_len]
         tgt_src_words_attn_bias = src_words_self_attn_bias[:, :, :, 0].unsqueeze(3) \
             .expand(-1, -1, -1, self.max_tgt_len, -1)
         tgt_src_words_attn_bias.requires_grad = False

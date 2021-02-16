@@ -26,10 +26,28 @@ class PositionWiseFeedForward(nn.Module):
         return out
 
 
-class PrePostProcessLayer(nn.Module):
+class PreProcessLayer(nn.Module):
 
     def __init__(self, d_model, process_cmd, dropout):
-        super(PrePostProcessLayer, self).__init__()
+        super(PreProcessLayer, self).__init__()
+        self.process_cmd = process_cmd
+        self.dropout = nn.Dropout(dropout)
+        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
+
+    def forward(self, out):
+        for cmd in self.process_cmd:
+            if cmd == 'n':
+                out = self.layer_norm(out)
+            elif cmd == 'd':
+                out = self.dropout(out)
+
+        return out
+
+
+class PostProcessLayer(nn.Module):
+
+    def __init__(self, d_model, process_cmd, dropout):
+        super(PostProcessLayer, self).__init__()
         self.process_cmd = process_cmd
         self.dropout = nn.Dropout(dropout)
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
