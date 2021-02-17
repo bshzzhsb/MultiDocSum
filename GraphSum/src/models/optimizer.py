@@ -15,7 +15,8 @@ def build_optim(args, model, checkpoint):
 
     if args.checkpoint != '':
         optimizer.optimizer.load_state_dict(checkpoint['optim'])
-        if args.visible_gpus != '-1':
+        optimizer._step = checkpoint['step']
+        if args.use_cuda:
             for state in optimizer.optimizer.state.values():
                 for k, v in state.items():
                     if torch.is_tensor(v):

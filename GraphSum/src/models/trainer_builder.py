@@ -7,7 +7,7 @@ from utils.statistics import Statistics
 from utils.report_manager import build_report_manager
 
 
-def build_trainer(args, device, model, symbols, vocab_size, optim, test_iter):
+def build_trainer(args, device, model, symbols, vocab_size, optim, get_test_iter):
     train_loss = build_loss_compute(symbols, vocab_size, device, train=True, label_smoothing=args.label_smoothing)
     valid_loss = build_loss_compute(symbols, vocab_size, device, train=False)
 
@@ -15,7 +15,7 @@ def build_trainer(args, device, model, symbols, vocab_size, optim, test_iter):
 
     tensorboard_log_dir = args.model_path + '/tensorboard'
     report_manager = build_report_manager(args.report_every, tensorboard_log_dir)
-    trainer = Trainer(args, model, optim, shard_size, train_loss, valid_loss, test_iter, report_manager)
+    trainer = Trainer(args, model, optim, shard_size, train_loss, valid_loss, get_test_iter, report_manager)
 
     n_params = sum([p.nelement() for p in model.parameters()])
     enc, dec = 0, 0
@@ -34,7 +34,7 @@ def build_trainer(args, device, model, symbols, vocab_size, optim, test_iter):
 class Trainer(object):
 
     def __init__(self, args, model, optim, shard_size, train_loss, valid_loss,
-                 valid_iter=None, report_manager=None):
+                 get_test_iter=None, report_manager=None):
         self.args = args
         self.model = model
         self.train_loss = train_loss
@@ -42,7 +42,7 @@ class Trainer(object):
         self.optim = optim
         self.shard_size = shard_size
         self.report_manager = report_manager
-        self.valid_iter = valid_iter
+        self.get_test_iter = get_test_iter
 
     def train(self, train_iter_fct, train_steps):
         logger.info('Start training...')
@@ -70,8 +70,9 @@ class Trainer(object):
                     self._save(step)
 
                 if step % self.args.val_steps == 0:
-                    if self.args.do_val and self.valid_iter:
-                        self.validate(self.valid_iter)
+                    valid_iter = self.get_test_iter()
+                    if self.args.do_val and valid_iter:
+                        self.validate(step, valid_iter)
 
                 step += 1
                 if step > train_steps:
@@ -80,7 +81,7 @@ class Trainer(object):
 
         return total_stats
 
-    def validate(self, valid_iter):
+    def validate(self, step, valid_iter):
         self.model.eval()
         stats = Statistics()
 
@@ -91,6 +92,7 @@ class Trainer(object):
                 output = self.model(enc_input, dec_input)
                 batch_stats = self.valid_loss.monolithic_compute_loss(tgt_label, output)
                 stats.update(batch_stats)
+            self._report_step(self.optim.learning_rate, step, valid_stats=stats)
             return stats
 
     def _gradient_accumulation(self, batch, normalization, total_stats, report_stats):
@@ -113,10 +115,9 @@ class Trainer(object):
         self.optim.step()
 
     def _save(self, step):
-        real_model = self.model
-        model_state_dict = real_model.state_dict()
         checkpoint = {
-            'model': model_state_dict,
+            'step': step,
+            'model': self.model.state_dict(),
             'opt': self.args,
             'optim': self.optim.optimizer.state_dict()
         }
@@ -141,6 +142,6 @@ class Trainer(object):
 
     def _report_step(self, lr, step, train_stats=None, valid_stats=None):
         if self.report_manager is not None:
-            return self.report_manager.report_step(
+            self.report_manager.report_step(
                 lr, step, train_stats=train_stats, valid_stats=valid_stats
             )

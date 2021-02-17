@@ -31,7 +31,8 @@ def train(args, device):
     torch.manual_seed(args.random_seed)
     random.seed(args.random_seed)
     if args.checkpoint != '':
-        checkpoint = None
+        logger.info('Loading checkpoint from %s' % args.checkpoint)
+        checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
     else:
         checkpoint = None
 
@@ -48,13 +49,15 @@ def train(args, device):
     def train_iter_fct():
         return Dataloader(args, load_dataset(args, 'train', shuffle=True), symbols,
                           args.batch_size, device, shuffle=True, is_test=False)
-    test_iter = Dataloader(args, load_dataset(args, 'test', shuffle=False), symbols,
-                           args.batch_size, device, shuffle=False, is_test=True)
 
-    model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], tokenizer=spm, device=device)
+    def get_test_iter():
+        return Dataloader(args, load_dataset(args, 'test', shuffle=False), symbols,
+                          args.batch_size, device, shuffle=False, is_test=True)
+
+    model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
     optim = build_optim(args, model, checkpoint)
     logger.info(model)
-    trainer = build_trainer(args, device, model, symbols, vocab_size, optim, test_iter)
+    trainer = build_trainer(args, device, model, symbols, vocab_size, optim, get_test_iter)
     trainer.train(train_iter_fct, args.epoch)
 
 
@@ -89,9 +92,11 @@ if __name__ == '__main__':
     parser.add_argument('-random_seed', default=1, type=int, help='Random seed')
 
     parser.add_argument('-epoch', default=20, type=int, help='Number of epochs for training')
-    parser.add_argument('-save_checkpoint_steps', default=10000, help='The steps interval to save checkpoints')
-    parser.add_argument('-report_every', default=100, help='The steps interval to report model')
-    parser.add_argument('-val_steps', default=10000, help='The steps interval to evaluate the model performance')
+    parser.add_argument('-save_checkpoint_steps', default=10000, type=int,
+                        help='The steps interval to save checkpoints')
+    parser.add_argument('-report_every', default=100, type=int, help='The steps interval to report model')
+    parser.add_argument('-val_steps', default=10000, type=int,
+                        help='The steps interval to evaluate the model performance')
 
     parser.add_argument('-weight_sharing', default=True, type=str2bool,
                         help='Whether to share weights between encoder and decoder')

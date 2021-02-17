@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.init import xavier_uniform_
 
 from modules.encoder import TransformerEncoder, GraphEncoder
 from modules.decoder import GraphDecoder
@@ -8,7 +9,7 @@ from modules.neural_modules import PreProcessLayer
 
 class GraphSum(nn.Module):
 
-    def __init__(self, args, padding_idx, bos_idx, eos_idx, tokenizer, device):
+    def __init__(self, args, padding_idx, bos_idx, eos_idx, tokenizer, device, checkpoint=None):
         super(GraphSum, self).__init__()
         self.args = args
         self.embed_size = args.hidden_size
@@ -113,6 +114,19 @@ class GraphSum(nn.Module):
             self.generator_fc.bias = nn.Parameter(torch.zeros(self.vocab_size, dtype=torch.float32), requires_grad=True)
 
         self.generator_log_softmax = nn.LogSoftmax(dim=-1)
+
+        if checkpoint is not None:
+            keys = list(checkpoint['model'].keys())
+            for k in keys:
+                if 'a_2' in k:
+                    checkpoint['model'][k.replace('a_2', 'weight')] = checkpoint['model'][k]
+                    del checkpoint['model'][k]
+                if 'b_2' in k:
+                    checkpoint['model'][k.replace('b_2', 'bias')] = checkpoint['model'][k]
+                    del checkpoint['model'][k]
+
+            self.load_state_dict(checkpoint['model'], strict=True)
+
         self.to(device)
 
     def encode(self, enc_input):
