@@ -731,21 +731,3 @@ class MultiNewsReader(object):
         return_list += [inst_weight]
 
         return return_list
-
-
-if __name__ == '__main__':
-    # data_reader = MultiNewsReader()
-    # data_loader = data_reader.data_generator(
-    #     data_path="/mnt/e/Projects/GraduationDesign/data/MultiNews/train",
-    #     batch_size=16,
-    #     epoch=10,
-    #     phase="train"
-    # )
-    # for data in data_loader():
-    #     print(data)
-    #     break
-
-    pt = "/mnt/d/Downloads/BrowserD/WIKI.train.31.pt"
-    pt1 = "/mnt/e/Projects/GraduationDesign/data/MultiNews/train/MultiNews.30.train.11.json"
-    dataset = json.load(open(pt1))
-    pass

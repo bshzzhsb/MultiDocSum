@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn.init import xavier_uniform_
+from torch.nn.init import normal_
 
 from modules.encoder import TransformerEncoder, GraphEncoder
 from modules.decoder import GraphDecoder
@@ -35,7 +35,6 @@ class GraphSum(nn.Module):
         self.max_para_num = args.max_para_num
         self.max_para_len = args.max_para_len
         self.max_tgt_len = args.max_tgt_len
-        self.len_penalty = args.len_penalty
         self.max_out_len = args.max_out_len
         self.min_out_len = args.min_out_len
         self.block_trigram = args.block_trigram

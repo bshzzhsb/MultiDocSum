@@ -2,11 +2,13 @@ import torch
 import argparse
 import random
 import sentencepiece
+import os
 
 from models.data_loader import Dataloader, load_dataset
 from models.model import GraphSum
 from models.optimizer import build_optim
 from models.trainer_builder import build_trainer
+from models.predictor_builder import build_predictor
 
 from utils.logging import init_logger, logger
 
@@ -25,11 +27,14 @@ def main(args):
     init_logger(args.log_file)
     if args.mode == 'train':
         train(args, device)
+    elif args.mode == 'test':
+        test(args, device)
 
 
 def train(args, device):
     torch.manual_seed(args.random_seed)
     random.seed(args.random_seed)
+
     if args.checkpoint != '':
         logger.info('Loading checkpoint from %s' % args.checkpoint)
         checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
@@ -56,9 +61,44 @@ def train(args, device):
 
     model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
     optim = build_optim(args, model, checkpoint)
-    logger.info(model)
+
+    with open(os.path.join(args.model_path, 'model.stru'), 'w') as file:
+        file.write(str(model))
+        logger.info('Write model structure to %s' % file.name)
+
     trainer = build_trainer(args, device, model, symbols, vocab_size, optim, get_test_iter)
-    trainer.train(train_iter_fct, args.epoch)
+    trainer.train(train_iter_fct, args.train_steps)
+
+
+def test(args, device):
+    assert args.checkpoint != ''
+
+    step = int(args.checkpoint.split('.')[-2].split('_')[-1])
+    logger.info('Loading checkpoint from %s' % args.checkpoint)
+    checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
+
+    spm = sentencepiece.SentencePieceProcessor()
+    spm.Load(args.vocab_path)
+    symbols = {'BOS': spm.PieceToId('<S>'), 'EOS': spm.PieceToId('</S>'),
+               'PAD': spm.PieceToId('<PAD>'), 'EOT': spm.PieceToId('<T>'),
+               'EOP': spm.PieceToId('<P>'), 'EOQ': spm.PieceToId('<Q>'),
+               'UNK': spm.PieceToId('<UNK>')}
+
+    model = GraphSum(
+        args,
+        padding_idx=symbols['PAD'],
+        bos_idx=symbols['BOS'],
+        eos_idx=symbols['EOS'],
+        tokenizer=spm,
+        device=device,
+        checkpoint=checkpoint
+    )
+    model.eval()
+
+    test_iter = Dataloader(args, load_dataset(args, 'test', shuffle=False), symbols,
+                           args.batch_size, device, shuffle=False, is_test=True)
+    predictor = build_predictor(args, spm, symbols, model, device)
+    predictor.translate(test_iter, step)
 
 
 if __name__ == '__main__':
@@ -91,7 +131,7 @@ if __name__ == '__main__':
     parser.add_argument('-max_grad_norm', default=2.0, type=float, help='The max gradient norm')
     parser.add_argument('-random_seed', default=1, type=int, help='Random seed')
 
-    parser.add_argument('-epoch', default=20, type=int, help='Number of epochs for training')
+    parser.add_argument('-train_steps', default=100000, type=int, help='Number of epochs for training')
     parser.add_argument('-save_checkpoint_steps', default=10000, type=int,
                         help='The steps interval to save checkpoints')
     parser.add_argument('-report_every', default=100, type=int, help='The steps interval to report model')
@@ -126,11 +166,14 @@ if __name__ == '__main__':
     parser.add_argument('-attn_dropout_prob', default=0.1, type=float, help='Attention Dropout probability')
     parser.add_argument('-pre_process_cmd', default='n', type=str, help='Preprocess command')
     parser.add_argument('-post_process_cmd', default='da', type=str, help='Postprocess command')
-    parser.add_argument('-initializer_range', default=0.02, type=float, help='Initializer range')
+
+    # for decode
+    parser.add_argument('-beam_size', default=5, type=int, help='Beam search')
+    parser.add_argument('-length_penalty', default=0.6, type=float, help='Length penalty during decoding')
+    parser.add_argument('-result_path', default='../results', type=str, help='The result path of decode')
+    parser.add_argument('-report_rouge', default=True, type=str2bool, help='Whether to report rouge when decode finish')
 
     # TODO
-    parser.add_argument('-beam_size', default=5, type=int, help='Beam search')
-    parser.add_argument('-len_penalty', default=0.6, type=float, help='Length penalty during decoding')
     parser.add_argument('-block_trigram', default=True, type=float, help='Remove repeated trigrams in summary')
 
     args = parser.parse_args()
