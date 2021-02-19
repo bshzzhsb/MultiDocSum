@@ -23,6 +23,7 @@ class GraphSum(nn.Module):
         self.attn_dropout = args.attn_dropout_prob
         self.pre_process_cmd = args.pre_process_cmd
         self.post_process_cmd = args.post_process_cmd
+        self.initializer_std = args.initializer_range
 
         self.d_model = self.embed_size
         self.padding_idx = padding_idx
@@ -125,6 +126,10 @@ class GraphSum(nn.Module):
                     del checkpoint['model'][k]
 
             self.load_state_dict(checkpoint['model'], strict=True)
+        else:
+            for name, param in self.named_parameters():
+                if 'pos' not in name and param.dim() > 1:
+                    normal_(param, mean=0, std=self.initializer_std)
 
         self.to(device)
 

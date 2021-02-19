@@ -130,6 +130,8 @@ if __name__ == '__main__':
     parser.add_argument('-lr', default=3, type=float, help='Learning rate of the model in training')
     parser.add_argument('-max_grad_norm', default=2.0, type=float, help='The max gradient norm')
     parser.add_argument('-random_seed', default=1, type=int, help='Random seed')
+    parser.add_argument('-initializer_range', default=0.02, type=int,
+                        help='The standard deviation (std) of model normal initializer')
 
     parser.add_argument('-train_steps', default=100000, type=int, help='Number of epochs for training')
     parser.add_argument('-save_checkpoint_steps', default=10000, type=int,
