@@ -1,6 +1,29 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
+
+
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, dim):
+        super(PositionalEncoding, self).__init__()
+        weight = torch.exp(torch.arange(0, dim, 2, dtype=torch.float32) *
+                           -(math.log(10000.0) / dim))
+        # [1, max_len, dim]
+        self.register_buffer('weight', weight)
+        self.dim = dim
+
+    def forward(self, pos):
+        pos_emb = torch.full((*pos.size(), self.dim), 0.0, dtype=torch.float32)
+        if len(pos.size()) == 2:
+            pos_emb[:, :, 0::2] = torch.sin(pos.unsqueeze(-1) * self.weight)
+            pos_emb[:, :, 1::2] = torch.cos(pos.unsqueeze(-1) * self.weight)
+        elif len(pos.size()) == 3:
+            pos_emb = torch.full((*pos.size(), self.dim), 0.0, dtype=torch.float32)
+            pos_emb[:, :, :, 0::2] = torch.sin(pos.unsqueeze(-1) * self.weight)
+            pos_emb[:, :, :, 1::2] = torch.cos(pos.unsqueeze(-1) * self.weight)
+        return pos_emb
 
 
 class PositionWiseFeedForward(nn.Module):

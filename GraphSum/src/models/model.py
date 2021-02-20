@@ -4,12 +4,13 @@ from torch.nn.init import normal_
 
 from modules.encoder import TransformerEncoder, GraphEncoder
 from modules.decoder import GraphDecoder
-from modules.neural_modules import PreProcessLayer
+from modules.neural_modules import PreProcessLayer, PositionalEncoding
 
 
 class GraphSum(nn.Module):
 
-    def __init__(self, args, padding_idx, bos_idx, eos_idx, tokenizer, device, checkpoint=None):
+    def __init__(self, args, padding_idx, bos_idx, eos_idx, tokenizer, device,
+                 checkpoint=None):
         super(GraphSum, self).__init__()
         self.args = args
         self.embed_size = args.hidden_size
@@ -24,6 +25,7 @@ class GraphSum(nn.Module):
         self.pre_process_cmd = args.pre_process_cmd
         self.post_process_cmd = args.post_process_cmd
         self.initializer_std = args.initializer_range
+        self.sc_pos_embed = args.sc_pos_embed
 
         self.d_model = self.embed_size
         self.padding_idx = padding_idx
@@ -42,15 +44,20 @@ class GraphSum(nn.Module):
         self.pos_win = args.pos_win
 
         self.encoder_word_embedding = nn.Embedding(self.vocab_size, self.embed_size, padding_idx)
-        self.encoder_word_pos_embedding = nn.Embedding(self.max_pos_seq_len, self.embed_size // 2)
-        self.encoder_word_pos_embedding.weight.requires_grad = False
-        self.encoder_sent_pos_embedding = nn.Embedding(self.max_pos_seq_len, self.embed_size // 2)
-        self.encoder_sent_pos_embedding.weight.requires_grad = False
         self.encoder_embedding_dropout = nn.Dropout(self.pre_post_process_dropout)
         self.decoder_embedding = nn.Embedding(self.vocab_size, self.embed_size, padding_idx)
-        self.decoder_pos_embedding = nn.Embedding(self.max_pos_seq_len, self.embed_size)
-        self.decoder_pos_embedding.weight.requires_grad = False
         self.decoder_embedding_dropout = nn.Dropout(self.pre_post_process_dropout)
+        if self.sc_pos_embed:
+            self.encoder_word_pos_embedding = PositionalEncoding(self.embed_size // 2)
+            self.encoder_sent_pos_embedding = PositionalEncoding(self.embed_size // 2)
+            self.decoder_pos_embedding = PositionalEncoding(self.embed_size)
+        else:
+            self.encoder_word_pos_embedding = nn.Embedding(self.max_pos_seq_len, self.embed_size // 2)
+            self.encoder_word_pos_embedding.weight.requires_grad = False
+            self.encoder_sent_pos_embedding = nn.Embedding(self.max_pos_seq_len, self.embed_size // 2)
+            self.encoder_sent_pos_embedding.weight.requires_grad = False
+            self.decoder_pos_embedding = nn.Embedding(self.max_pos_seq_len, self.embed_size)
+            self.decoder_pos_embedding.weight.requires_grad = False
 
         if self.weight_sharing:
             self.decoder_embedding.weight = self.encoder_word_embedding.weight
@@ -143,11 +150,9 @@ class GraphSum(nn.Module):
 
         # [batch_size, max_n_blocks, max_n_tokens, embed_dim / 2]
         word_pos_out = self.encoder_word_pos_embedding(src_word_pos)
-        word_pos_out = word_pos_out.detach()
 
         # [batch_size, max_n_blocks, embed_dim / 2]
         sent_pos_out = self.encoder_sent_pos_embedding(src_sent_pos)
-        sent_pos_out = sent_pos_out.detach()
 
         # [batch_size, max_n_blocks, max_n_tokens, embed_dim / 2]
         sent_pos_out = torch.unsqueeze(sent_pos_out, 2).expand(-1, -1, self.max_para_len, -1)
@@ -187,7 +192,6 @@ class GraphSum(nn.Module):
         embed_out = embed_out * (self.embed_size ** 0.5)
 
         pos_embed_out = self.decoder_pos_embedding(tgt_pos)
-        pos_embed_out = pos_embed_out.detach()
 
         embed_out = embed_out + pos_embed_out
         embed_out = self.decoder_embedding_dropout(embed_out)

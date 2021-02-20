@@ -129,7 +129,7 @@ if __name__ == '__main__':
     parser.add_argument('-optim', default='adam', type=str, help='The optimizer used in training')
     parser.add_argument('-lr', default=3, type=float, help='Learning rate of the model in training')
     parser.add_argument('-max_grad_norm', default=2.0, type=float, help='The max gradient norm')
-    parser.add_argument('-random_seed', default=1, type=int, help='Random seed')
+    parser.add_argument('-random_seed', default=0, type=int, help='Random seed')
     parser.add_argument('-initializer_range', default=0.02, type=int,
                         help='The standard deviation (std) of model normal initializer')
 
@@ -143,6 +143,7 @@ if __name__ == '__main__':
     parser.add_argument('-weight_sharing', default=True, type=str2bool,
                         help='Whether to share weights between encoder and decoder')
     parser.add_argument('-max_generator_batches', default=32, type=int, help='shard size in compute loss when training')
+    parser.add_argument('-sc_pos_embed', default=True, type=str2bool, help='Whether to use sin-cos embedding on position')
 
     parser.add_argument('-max_out_len', default=300, type=int, help='max length of decoding')
     parser.add_argument('-min_out_len', default=200, type=int, help='min length of decoding')
