@@ -175,8 +175,6 @@ if __name__ == '__main__':
     parser.add_argument('-length_penalty', default=0.6, type=float, help='Length penalty during decoding')
     parser.add_argument('-result_path', default='../results', type=str, help='The result path of decode')
     parser.add_argument('-report_rouge', default=True, type=str2bool, help='Whether to report rouge when decode finish')
-
-    # TODO
     parser.add_argument('-block_trigram', default=True, type=float, help='Remove repeated trigrams in summary')
 
     args = parser.parse_args()
