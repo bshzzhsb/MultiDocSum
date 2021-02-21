@@ -36,6 +36,7 @@ class Translator(object):
         self.result_path = self.args.result_path
 
         self.length_penalty = self.args.length_penalty
+        self.blocking_trigram = self.args.block_trigram
 
     def translate(self, test_iter, step):
         logger.info('Start predicting')
@@ -147,6 +148,19 @@ class Translator(object):
             length_penalty = ((5.0 + (step + 1)) / 6.0) ** self.length_penalty
 
             cur_scores = logits / length_penalty
+
+            if self.blocking_trigram:
+                cur_len = alive_seq.size(1)
+                if cur_len > 3:
+                    for i in range(batch_size * beam_size):
+                        words = list(map(lambda w: self.vocab.IdToPiece(int(w)), alive_seq[i]))
+                        if len(words) <= 3:
+                            continue
+                        trigrams = [(words[i - 1], words[i], words[i + 1]) for i in range(1, len(words) - 1)]
+                        trigram = trigrams[-1]
+                        if trigram in trigrams[:-1]:
+                            cur_scores[i] = -1e20
+
             cur_scores = cur_scores.reshape(-1, beam_size * vocab_size)
             # [batch_size, beam_size]
             topk_scores, topk_ids = cur_scores.topk(beam_size, dim=-1)
