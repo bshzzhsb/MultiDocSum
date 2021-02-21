@@ -42,11 +42,11 @@ class Translator(object):
         logger.info('Start predicting')
         self.model.eval()
 
-        gold_path = self.result_path + '.%d.gold' % step
-        candi_path = self.result_path + '.%d.candidate' % step
-        raw_gold_path = self.result_path + '.%d.raw_gold' % step
-        raw_candi_path = self.result_path + '.%d.raw_candidate' % step
-        raw_src_path = self.result_path + '.%d.raw_src' % step
+        gold_path = self.result_path + '/res.%d.gold' % step
+        candi_path = self.result_path + '/res.%d.candidate' % step
+        raw_gold_path = self.result_path + '/res.%d.raw_gold' % step
+        raw_candi_path = self.result_path + '/res.%d.raw_candidate' % step
+        raw_src_path = self.result_path + '/res.%d.raw_src' % step
         gold_file = open(gold_path, 'w', encoding='utf-8')
         candi_file = open(candi_path, 'w', encoding='utf-8')
         raw_gold_file = open(raw_gold_path, 'w', encoding='utf-8')
