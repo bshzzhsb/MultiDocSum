@@ -15,12 +15,12 @@ class PositionalEncoding(nn.Module):
         self.dim = dim
 
     def forward(self, pos):
-        pos_emb = torch.full((*pos.size(), self.dim), 0.0, dtype=torch.float32)
+        device = pos.device
+        pos_emb = torch.full((*pos.size(), self.dim), 0.0, dtype=torch.float32, device=device)
         if len(pos.size()) == 2:
             pos_emb[:, :, 0::2] = torch.sin(pos.unsqueeze(-1) * self.weight)
             pos_emb[:, :, 1::2] = torch.cos(pos.unsqueeze(-1) * self.weight)
         elif len(pos.size()) == 3:
-            pos_emb = torch.full((*pos.size(), self.dim), 0.0, dtype=torch.float32)
             pos_emb[:, :, :, 0::2] = torch.sin(pos.unsqueeze(-1) * self.weight)
             pos_emb[:, :, :, 1::2] = torch.cos(pos.unsqueeze(-1) * self.weight)
         return pos_emb
