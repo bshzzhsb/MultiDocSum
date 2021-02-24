@@ -98,10 +98,10 @@ class Translator(object):
         enc_input = batch.enc_input
         _, _, _, src_words_self_attn_bias, src_sents_self_attn_bias, graph_attn_bias = enc_input
 
-        # [batch_size, max_para_num, n_heads, max_para_len]
+        # [batch_size, max_para_num, n_heads, 1, max_para_len]
         tgt_src_words_attn_bias = src_words_self_attn_bias[:, :, :, 0].unsqueeze(3)
         tgt_src_words_attn_bias.requires_grad = False
-        # [batch_size, n_heads, max_para_num]
+        # [batch_size, n_heads, 1, max_para_num]
         tgt_src_sents_attn_bias = src_sents_self_attn_bias[:, :, 0].unsqueeze(2)
         tgt_src_sents_attn_bias.requires_grad = False
 
@@ -131,13 +131,23 @@ class Translator(object):
         pre_graph_attn_bias = tile(graph_attn_bias, beam_size, 0)
 
         for step in range(self.max_out_len):
-            pre_ids = alive_seq[:, -1].view(-1, 1)
-            pre_pos = torch.full_like(pre_ids, step, dtype=torch.int64, device=self.device)
+            # pre_ids = alive_seq[:, -1].view(-1, 1)
+            # pre_pos = torch.full_like(pre_ids, step, dtype=torch.int64, device=self.device)
+            pre_ids = alive_seq.clone()
+            pre_pos = torch.arange(0, pre_ids.size(1), 1, dtype=torch.int64, device=self.device) \
+                .expand(pre_ids.size(0), -1)
+            pre_self_attn_bias = [[[1.0] * (step + 1)] * (step + 1)] * pre_ids.size(0)
+            pre_self_attn_bias = torch.triu(
+                torch.tensor(pre_self_attn_bias, dtype=torch.float32, device=self.device), diagonal=1
+            ) * -1e18
+            pre_self_attn_bias = pre_self_attn_bias.unsqueeze(1).expand(-1, graph_attn_bias.size(1), -1, -1)
 
-            dec_input = (pre_ids, pre_pos, None, pre_src_words_attn_bias,
+            dec_input = (pre_ids, pre_pos, pre_self_attn_bias, pre_src_words_attn_bias,
                          pre_src_sents_attn_bias, pre_graph_attn_bias)
 
             logits = self.model.decode(dec_input, enc_words_output, enc_sents_output)
+            logits = logits.view(-1, step + 1, logits.size(-1))
+            logits = logits[:, -1, :]
             vocab_size = logits.size(-1)
 
             if step < self.min_out_len:
@@ -214,6 +224,14 @@ class Translator(object):
             enc_sents_output = enc_sents_output.index_select(0, select_indices)
             pre_src_words_attn_bias = pre_src_words_attn_bias.index_select(0, select_indices)
             pre_src_sents_attn_bias = pre_src_sents_attn_bias.index_select(0, select_indices)
+            pre_src_words_attn_bias = torch.cat(
+                [pre_src_words_attn_bias, pre_src_words_attn_bias[:, :, :, -1].unsqueeze(3)],
+                dim=3
+            )
+            pre_src_sents_attn_bias = torch.cat(
+                [pre_src_sents_attn_bias, pre_src_sents_attn_bias[:, :, -1].unsqueeze(2)],
+                dim=2
+            )
 
         return results
 
