@@ -27,7 +27,7 @@ class MultiHeadAttention(nn.Module):
 
         self.attn = ScaledDotProductAttention(dropout, d_k)
 
-    def forward(self, q, k, v, bias):
+    def forward(self, q, k, v, bias, cache=None, type=None):
         """
         :param q: [batch_size, seq_len, d_model]
         :param k: [batch_size, len_k, d_model]
@@ -39,22 +39,49 @@ class MultiHeadAttention(nn.Module):
         k = q if k is None else k
         v = k if v is None else v
 
-        d_k, d_v, n_heads = self.d_k, self.d_v, self.n_heads
+        dim_per_head, n_heads = self.d_k, self.n_heads
         batch_size, len_q, len_k, len_v = q.size(0), q.size(1), k.size(1), v.size(1)
 
-        # [batch_size, len, n_heads, dim_per_head]
-        q = self.w_qs(q).view(batch_size, len_q, n_heads, d_k)
-        k = self.w_ks(k).view(batch_size, len_k, n_heads, d_k)
-        v = self.w_vs(v).view(batch_size, len_v, n_heads, d_v)
+        def shape(x):
+            # [batch_size, n_heads, len, dim_per_head]
+            return x.view(batch_size, -1, n_heads, dim_per_head).transpose(1, 2)
 
-        # [batch_size, n_heads, len, dim_per_head]
-        q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
+        def unshape(x):
+            return x.transpose(1, 2).contiguous().view(batch_size, -1, n_heads * dim_per_head)
+
+        if cache is not None:
+            if type == 'self':
+                q, k, v = self.w_qs(q), self.w_ks(k), self.w_vs(v)
+                k, v = shape(k), shape(v)
+
+                device = k.device
+                if cache['self_keys'] is not None:
+                    k = torch.cat([cache['self_keys'].to(device), k], dim=2)
+                if cache['self_values'] is not None:
+                    v = torch.cat([cache['self_values'].to(device), v], dim=2)
+                cache['self_keys'] = k
+                cache['self_values'] = v
+            elif type == 'context':
+                q = self.w_qs(q)
+                if cache['memory_keys'] is None:
+                    k, v = self.w_ks(k), self.w_vs(v)
+                    k = shape(k)
+                    v = shape(v)
+                else:
+                    k, v = cache['memory_keys'], cache['memory_values']
+                cache['memory_keys'] = k
+                cache['memory_values'] = v
+        else:
+            q, k, v = self.w_qs(q), self.w_ks(k), self.w_vs(v)
+            k, v = shape(k), shape(v)
+
+        q = shape(q)
 
         # [batch_size, n_heads, len_q, d_v] [batch_size, n_heads, len_q, len_k]
         out = self.attn(q, k, v, bias)
 
         # [batch_size, len_q, d_model]
-        out = out.transpose(1, 2).contiguous().view(batch_size, len_q, -1)
+        out = unshape(out)
         out = self.fc(out)
 
         # [batch_size, len_q, d_model]
@@ -174,7 +201,7 @@ class MultiHeadHierarchicalAttention(nn.Module):
             dropout, d_model, d_k, d_v, n_heads
         )
 
-    def forward(self, q, k_s, v_s, k_w, v_w, bias_w, bias_s, graph_attn_bias):
+    def forward(self, q, k_s, v_s, k_w, v_w, bias_w, bias_s, graph_attn_bias, cache=None):
         """
         :param q: [batch_size, seq_len, d_model]
         :param k_s: [batch_size, n_blocks, d_model]
@@ -187,29 +214,50 @@ class MultiHeadHierarchicalAttention(nn.Module):
         d_model = dim_embed = n_heads * d_k = n_heads * d_v
         len_k_s = len_v_s = len_k_w = len_v_w = n_blocks
         """
-        d_k, d_v, n_heads = self.d_k, self.d_v, self.n_heads
+        dim_per_head, n_heads = self.d_k, self.n_heads
         batch_size, len_q = q.size(0), q.size(1)
         len_k_s, len_v_s, len_k_w, len_v_w, n_tokens = \
             k_s.size(1), v_s.size(1), k_w.size(1), v_w.size(1), k_w.size(2)
 
-        q_s = self.w_qs_s(q).view(batch_size, len_q, n_heads, d_k)
-        k_s = self.w_ks_s(k_s).view(batch_size, len_k_s, n_heads, d_k)
-        v_s = self.w_vs_s(v_s).view(batch_size, len_v_s, n_heads, d_v)
+        def shape(x):
+            return x.view(batch_size, -1, n_heads, dim_per_head).transpose(1, 2)
 
-        # [batch_size, n_heads, len, dim_per_head]
-        q_s, k_s, v_s = q_s.transpose(1, 2), k_s.transpose(1, 2), v_s.transpose(1, 2)
+        def shape_w(x):
+            return x.view(batch_size, -1, n_tokens, n_heads, dim_per_head).transpose(2, 3)
+
+        q_s = self.w_qs_s(q)
+        q_s = shape(q_s)
+
+        if cache is not None:
+            if cache['static_k_sent'] is not None:
+                k_s, v_s = cache['static_k_sent'], cache['static_v_sent']
+            else:
+                k_s, v_s = self.w_ks_s(k_s), self.w_vs_s(v_s)
+                k_s, v_s = shape(k_s), shape(v_s)
+                cache['static_k_sent'], cache['static_v_sent'] = k_s, v_s
+        else:
+            k_s, v_s = self.w_ks_s(k_s), self.w_vs_s(v_s)
+            k_s, v_s = shape(k_s), shape(v_s)
 
         # [batch_size, len_q, d_model] [batch_size, n_heads, len_q, len_k_s]
         context_s, attns = self.graph_attn(q_s, k_s, v_s, bias_s, graph_attn_bias)
 
-        q_w = self.w_qs_w(q).view(batch_size, len_q, n_heads, d_k)
-        k_w = self.w_ks_w(k_w).view(batch_size, len_k_w, n_tokens, n_heads, d_k)
-        v_w = self.w_vs_w(v_w).view(batch_size, len_v_w, n_tokens, n_heads, d_v)
-
+        q_w = self.w_qs_w(q)
         # [batch_size, n_heads, len_q, d_k]
-        # [batch_size, len_k_w, n_heads, n_tokens, d_k]
-        # [batch_size, len_v_w, n_heads, n_tokens, d_v]
-        q_w, k_w, v_w = q_w.transpose(1, 2), k_w.transpose(2, 3), v_w.transpose(2, 3)
+        q_w = shape(q_w)
+
+        if cache is not None:
+            if cache['static_k_word'] is not None:
+                k_w, v_w = cache['static_k_word'], cache['static_v_word']
+            else:
+                k_w, v_w = self.w_ks_w(k_w), self.w_vs_w(v_w)
+                k_w, v_w = shape_w(k_w), shape_w(v_w)
+                cache['static_k_word'], cache['static_v_word'] = k_w, v_w
+        else:
+            k_w, v_w = self.w_ks_w(k_w), self.w_vs_w(v_w)
+            # [batch_size, len_k_w, n_heads, n_tokens, d_k]
+            # [batch_size, len_v_w, n_heads, n_tokens, d_v]
+            k_w, v_w = shape_w(k_w), shape_w(v_w)
 
         # [batch_size, len_q, d_model]
         context_w, _ = self.attn_with_sent_norm(q_w, k_w, v_w, attns, bias_w)

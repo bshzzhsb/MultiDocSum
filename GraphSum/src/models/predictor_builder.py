@@ -109,6 +109,8 @@ class Translator(object):
         enc_words_output = tile(enc_words_output, beam_size, 0)
         enc_sents_output = tile(enc_sents_output, beam_size, 0)
 
+        dec_state = self.model.graph_decoder.init_decoder_state(with_cache=True)
+
         batch_offset = torch.arange(batch_size, dtype=torch.int64, device=self.device)
         beam_offset = torch.arange(0, batch_size * beam_size, step=beam_size, dtype=torch.int64, device=self.device)
 
@@ -131,23 +133,13 @@ class Translator(object):
         pre_graph_attn_bias = tile(graph_attn_bias, beam_size, 0)
 
         for step in range(self.max_out_len):
-            # pre_ids = alive_seq[:, -1].view(-1, 1)
-            # pre_pos = torch.full_like(pre_ids, step, dtype=torch.int64, device=self.device)
-            pre_ids = alive_seq.clone()
-            pre_pos = torch.arange(0, pre_ids.size(1), 1, dtype=torch.int64, device=self.device) \
-                .expand(pre_ids.size(0), -1)
-            pre_self_attn_bias = [[[1.0] * (step + 1)] * (step + 1)] * pre_ids.size(0)
-            pre_self_attn_bias = torch.triu(
-                torch.tensor(pre_self_attn_bias, dtype=torch.float32, device=self.device), diagonal=1
-            ) * -1e18
-            pre_self_attn_bias = pre_self_attn_bias.unsqueeze(1).expand(-1, graph_attn_bias.size(1), -1, -1)
+            pre_ids = alive_seq[:, -1].view(-1, 1)
+            pre_pos = torch.full_like(pre_ids, step, dtype=torch.int64, device=self.device)
 
-            dec_input = (pre_ids, pre_pos, pre_self_attn_bias, pre_src_words_attn_bias,
+            dec_input = (pre_ids, pre_pos, None, pre_src_words_attn_bias,
                          pre_src_sents_attn_bias, pre_graph_attn_bias)
 
-            logits = self.model.decode(dec_input, enc_words_output, enc_sents_output)
-            logits = logits.view(-1, step + 1, logits.size(-1))
-            logits = logits[:, -1, :]
+            logits = self.model.decode(dec_input, enc_words_output, enc_sents_output, dec_state)
             vocab_size = logits.size(-1)
 
             if step < self.min_out_len:
@@ -162,7 +154,7 @@ class Translator(object):
             if self.blocking_trigram:
                 cur_len = alive_seq.size(1)
                 if cur_len > 3:
-                    for i in range(batch_size * beam_size):
+                    for i in range(alive_seq.size(0)):
                         words = list(map(lambda w: self.vocab.IdToPiece(int(w)), alive_seq[i]))
                         if len(words) <= 3:
                             continue
@@ -224,14 +216,8 @@ class Translator(object):
             enc_sents_output = enc_sents_output.index_select(0, select_indices)
             pre_src_words_attn_bias = pre_src_words_attn_bias.index_select(0, select_indices)
             pre_src_sents_attn_bias = pre_src_sents_attn_bias.index_select(0, select_indices)
-            pre_src_words_attn_bias = torch.cat(
-                [pre_src_words_attn_bias, pre_src_words_attn_bias[:, :, :, -1].unsqueeze(3)],
-                dim=3
-            )
-            pre_src_sents_attn_bias = torch.cat(
-                [pre_src_sents_attn_bias, pre_src_sents_attn_bias[:, :, -1].unsqueeze(2)],
-                dim=2
-            )
+
+            dec_state.map_batch_fn(lambda state, dim: state.index_select(dim, select_indices))
 
         return results
 

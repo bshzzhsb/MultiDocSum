@@ -233,7 +233,7 @@ class ScaledDotProductAttentionWithSentenceNorm(nn.Module):
         attn_w = self.dropout(attn_w)
 
         # [batch_size, n_heads, len_v * n_tokens, d_v]
-        v_w = v.transpose(1, 2).view(batch_size, n_heads, -1, d_v)
+        v_w = v.transpose(1, 2).contiguous().view(batch_size, n_heads, -1, d_v)
 
         # [batch_size, n_heads, len_q, d_v]
         out = torch.matmul(attn_w, v_w)

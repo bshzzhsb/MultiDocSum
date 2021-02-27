@@ -184,7 +184,7 @@ class GraphSum(nn.Module):
 
         return enc_words_out, enc_sents_out
 
-    def decode(self, dec_input, enc_words_out, enc_sents_out):
+    def decode(self, dec_input, enc_words_out, enc_sents_out, state=None):
         tgt_word, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias, \
             tgt_src_sents_attn_bias, graph_attn_bias = dec_input
 
@@ -197,8 +197,9 @@ class GraphSum(nn.Module):
         embed_out = self.decoder_embedding_dropout(embed_out)
 
         dec_output = self.graph_decoder(
-            embed_out, enc_words_out, enc_sents_out,
-            tgt_self_attn_bias, tgt_src_words_attn_bias, tgt_src_sents_attn_bias, graph_attn_bias
+            embed_out, enc_words_out, enc_sents_out, tgt_self_attn_bias,
+            tgt_src_words_attn_bias, tgt_src_sents_attn_bias, graph_attn_bias,
+            state=state
         )
 
         dec_output = dec_output.contiguous().view(-1, self.embed_size)
