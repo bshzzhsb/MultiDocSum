@@ -1,9 +1,13 @@
 import torch
 import torch.nn
+import codecs
+import math
+from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
 from utils.logging import logger
 from utils.tensor_util import tile
+from models.data_loader import get_num_examples
 from utils.cal_rouge import rouge_results_to_str, test_rouge
 
 
@@ -47,14 +51,15 @@ class Translator(object):
         raw_gold_path = self.result_path + '/res.%d.raw_gold' % step
         raw_candi_path = self.result_path + '/res.%d.raw_candidate' % step
         raw_src_path = self.result_path + '/res.%d.raw_src' % step
-        gold_file = open(gold_path, 'w', encoding='utf-8')
-        candi_file = open(candi_path, 'w', encoding='utf-8')
-        raw_gold_file = open(raw_gold_path, 'w', encoding='utf-8')
-        raw_candi_file = open(raw_candi_path, 'w', encoding='utf-8')
-        raw_src_file = open(raw_src_path, 'w', encoding='utf-8')
+        gold_file = codecs.open(gold_path, 'w', encoding='utf-8')
+        candi_file = codecs.open(candi_path, 'w', encoding='utf-8')
+        raw_gold_file = codecs.open(raw_gold_path, 'w', encoding='utf-8')
+        raw_candi_file = codecs.open(raw_candi_path, 'w', encoding='utf-8')
+        raw_src_file = codecs.open(raw_src_path, 'w', encoding='utf-8')
 
         with torch.no_grad():
-            for batch in test_iter:
+            total = math.ceil(get_num_examples(self.args.data_path, self.args.mode) / self.batch_size)
+            for batch in tqdm(test_iter, total=total):
                 batch_data = self.translate_batch(batch, self.n_best)
 
                 translations = self.from_batch(batch_data)
@@ -192,7 +197,7 @@ class Translator(object):
                     if end_condition[i]:
                         is_finished[i].fill_(True)
                     # 把完成的 beam 加入结果集
-                    finished_hyp = is_finished[i].nonzero().view(-1)
+                    finished_hyp = is_finished[i].nonzero(as_tuple=False).view(-1)
                     for j in finished_hyp:
                         hypotheses[b].append((topk_scores[i, j], predictions[i, j, 1:]))
 
@@ -203,7 +208,7 @@ class Translator(object):
                                 break
                             results['scores'][b].append(score)
                             results['predictions'][b].append(pred)
-                non_finished = (~end_condition).nonzero().view(-1)
+                non_finished = (~end_condition).nonzero(as_tuple=False).view(-1)
                 if len(non_finished) == 0:
                     break
                 topk_log_probs = topk_log_probs.index_select(0, non_finished)
