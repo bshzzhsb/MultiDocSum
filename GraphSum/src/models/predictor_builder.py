@@ -65,10 +65,10 @@ class Translator(object):
                 translations = self.from_batch(batch_data)
                 for translation in translations:
                     pred, gold, src = translation
-                    pred_str = ' '.join(pred).replace('<Q>', ' ').replace(r' +', ' ') \
+                    pred_str = ' '.join(pred).replace('<Q>', ' ').replace(' +', ' ') \
                                   .replace('<unk>', 'UNK').replace('\\', '').strip()
                     gold_str = ' '.join(gold).replace('<t>', '').replace('</t>', '') \
-                                  .replace('<Q>', ' ').replace(r' +', ' ').replace('\\', '').strip()
+                                  .replace('<Q>', ' ').replace(' +', ' ').replace('\\', '').strip()
 
                     gold_str = gold_str.lower()
                     raw_candi_file.write(' '.join(pred).strip() + ' \n')
@@ -76,8 +76,6 @@ class Translator(object):
                     candi_file.write(pred_str + ' \n')
                     gold_file.write(gold_str + ' \n')
                     raw_src_file.write(src.strip() + ' \n')
-                    logger.info(pred_str)
-                    logger.info(gold_str)
 
                 raw_candi_file.flush()
                 raw_gold_file.flush()
