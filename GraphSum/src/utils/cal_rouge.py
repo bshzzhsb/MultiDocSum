@@ -8,7 +8,7 @@ def process(data):
     candidates, references, pool_id = data
     count = len(candidates)
     current_time = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())
-    tmp_dir = 'rouge-tmp-{}-{}'.format(current_time, pool_id)
+    tmp_dir = '../results/rouge-tmp-{}-{}'.format(current_time, pool_id)
     if not os.path.isdir(tmp_dir):
         os.mkdir(tmp_dir)
         os.mkdir(tmp_dir + '/candidate')
@@ -69,8 +69,8 @@ def test_rouge(candi, ref, num_processes):
 
 
 def rouge_results_to_str(results_dict):
-    return ">> ROUGE_F(1/2/3/l): {:.2f}/{:.2f}/{:.2f}\n" \
-           "ROUGE-R(1/2/3/l): {:.2f}/{:.2f}/{:.2f}\n".format(
+    return ">> ROUGE_F(1/2/l): {:.2f}/{:.2f}/{:.2f}\n" \
+           "ROUGE-R(1/2/l): {:.2f}/{:.2f}/{:.2f}\n".format(
                 results_dict['rouge_1_f_score'] * 100,
                 results_dict['rouge_2_f_score'] * 100,
                 results_dict['rouge_l_f_score'] * 100,

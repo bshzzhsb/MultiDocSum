@@ -1,6 +1,5 @@
 import torch
 import torch.nn
-import codecs
 import math
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
@@ -51,19 +50,15 @@ class Translator(object):
         raw_gold_path = self.result_path + '/res.%d.raw_gold' % step
         raw_candi_path = self.result_path + '/res.%d.raw_candidate' % step
         raw_src_path = self.result_path + '/res.%d.raw_src' % step
-        gold_file = codecs.open(gold_path, 'w', encoding='utf-8')
-        candi_file = codecs.open(candi_path, 'w', encoding='utf-8')
-        raw_gold_file = codecs.open(raw_gold_path, 'w', encoding='utf-8')
-        raw_candi_file = codecs.open(raw_candi_path, 'w', encoding='utf-8')
-        raw_src_file = codecs.open(raw_src_path, 'w', encoding='utf-8')
+        gold_file = open(gold_path, 'w', encoding='utf-8')
+        candi_file = open(candi_path, 'w', encoding='utf-8')
+        raw_gold_file = open(raw_gold_path, 'w', encoding='utf-8')
+        raw_candi_file = open(raw_candi_path, 'w', encoding='utf-8')
+        raw_src_file = open(raw_src_path, 'w', encoding='utf-8')
 
         with torch.no_grad():
-            a = 0
             total = math.ceil(get_num_examples(self.args.data_path, self.args.mode) / self.batch_size)
             for batch in tqdm(test_iter, total=total):
-                if a < 498:
-                    a += 1
-                    continue
                 self.batch_size = batch.batch_size
                 batch_data = self.translate_batch(batch, self.n_best)
 
@@ -87,7 +82,6 @@ class Translator(object):
                 candi_file.flush()
                 gold_file.flush()
                 raw_src_file.flush()
-                break
 
         raw_candi_file.close()
         raw_gold_file.close()
