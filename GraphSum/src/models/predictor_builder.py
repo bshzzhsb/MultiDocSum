@@ -58,8 +58,13 @@ class Translator(object):
         raw_src_file = codecs.open(raw_src_path, 'w', encoding='utf-8')
 
         with torch.no_grad():
+            a = 0
             total = math.ceil(get_num_examples(self.args.data_path, self.args.mode) / self.batch_size)
             for batch in tqdm(test_iter, total=total):
+                if a < 498:
+                    a += 1
+                    continue
+                self.batch_size = batch.batch_size
                 batch_data = self.translate_batch(batch, self.n_best)
 
                 translations = self.from_batch(batch_data)
@@ -82,6 +87,7 @@ class Translator(object):
                 candi_file.flush()
                 gold_file.flush()
                 raw_src_file.flush()
+                break
 
         raw_candi_file.close()
         raw_gold_file.close()
