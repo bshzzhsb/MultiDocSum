@@ -91,6 +91,7 @@ class Translator(object):
 
         if step != -1 and self.args.report_rouge:
             rouges = self._report_rouge(gold_path, candi_path)
+            logger.info(rouges)
             logger.info('Rouges at step %d \n %s' % (step, rouge_results_to_str(rouges)))
             if self.writer is not None:
                 self.writer.add_scalar('test/rouge1-F', rouges['rouge_1_f_score'], step)
