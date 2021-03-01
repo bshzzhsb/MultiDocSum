@@ -3,6 +3,8 @@ import time
 from pyrouge import Rouge155
 from multiprocessing import Pool
 
+from utils.logging import logger
+
 
 def process(data):
     candidates, references, pool_id = data
@@ -27,7 +29,7 @@ def process(data):
     r.model_filename_pattern = 'ref.#ID#.txt'
     r.system_filename_pattern = r'candi.(\d+).txt'
     rouge_results = r.convert_and_evaluate()
-    print(rouge_results)
+    logger.info(rouge_results)
     results_dict = r.output_to_dict(rouge_results)
 
     return results_dict
