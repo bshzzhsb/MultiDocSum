@@ -7,8 +7,10 @@ def build_optim(args, model, checkpoint):
     optimizer = Optimizer(
         args.optim, args.lr, args.max_grad_norm,
         beta1=args.beta1, beta2=args.beta2,
-        decay_method=args.decay_method,
-        warmup_steps=args.warmup_steps, model_size=args.hidden_size
+        lr_scheduler=args.lr_scheduler,
+        warmup_steps=args.warmup_steps,
+        train_steps=args.train_steps,
+        model_size=args.hidden_size
     )
 
     optimizer.set_parameters(list(model.named_parameters()))
@@ -31,9 +33,9 @@ def build_optim(args, model, checkpoint):
 class Optimizer(object):
 
     def __init__(self, method='adam', learning_rate=3, max_grad_norm=0,
-                 lr_decay=1, start_decay_steps=None, decay_steps=None,
-                 beta1=0.9, beta2=0.999, adagrad_accum=0.0,
-                 decay_method=None, warmup_steps=4000, model_size=None):
+                 start_decay_steps=None, decay_steps=None, train_steps=None,
+                 lr_decay=1, beta1=0.9, beta2=0.999, adagrad_accum=0.0,
+                 lr_scheduler=None, warmup_steps=4000, model_size=None):
         self.method = method
         self.learning_rate = learning_rate
         self.original_lr = learning_rate
@@ -44,9 +46,10 @@ class Optimizer(object):
         self._step = 0
         self.betas = (beta1, beta2)
         self.adagrad_accum = adagrad_accum
-        self.decay_method = decay_method
+        self.lr_scheduler = lr_scheduler
         self.warmup_steps = warmup_steps
         self.model_size = model_size
+        self.train_steps = train_steps
 
         self.last_ppl = None
         self.start_decay = False
@@ -68,19 +71,24 @@ class Optimizer(object):
 
     def step(self):
         self._step += 1
-        if self.decay_method == "noam":
+        if self.lr_scheduler == "noam":
             self._set_rate(
                 self.original_lr *
                 (self.model_size ** -0.5 *
                  min(self._step ** -0.5, self._step * self.warmup_steps ** -1.5)))
+        elif self.lr_scheduler == 'linear_warmup_decay':
+            if self._step < self.warmup_steps:
+                self._set_rate(self.original_lr * (self._step / self.warmup_steps))
+            else:
+                self._set_rate(
+                    self.original_lr *
+                    (1 - (self._step - self.warmup_steps) / self.train_steps))
         else:
             if self.start_decay_steps is not None and self._step > self.start_decay_steps:
                 self.start_decay = True
             if self.start_decay:
                 if (self._step - self.start_decay_steps) % self.decay_steps == 0:
-                    self.learning_rate = self.learning_rate * self.lr_decay
-
-        self.optimizer.param_groups[0]['lr'] = self.learning_rate
+                    self._set_rate(self.learning_rate * self.lr_decay)
 
         if self.max_grad_norm:
             clip_grad_norm_(self.params, self.max_grad_norm)

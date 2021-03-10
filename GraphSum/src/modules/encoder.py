@@ -181,7 +181,7 @@ class GraphEncoder(nn.Module):
         """
         :param enc_words_input: [batch_size * n_blocks, n_tokens, d_model]
         :param src_words_self_attn_bias: [batch_size * n_blocks, n_heads, n_tokens, d_model]
-        :param src_sents_self_attn_bias: [batch_size , n_heads, n_blocks, n_blocks]
+        :param src_sents_self_attn_bias: [batch_size, n_heads, n_blocks, n_blocks]
         :return: [batch_size, n_blocks, d_model]
         """
         # [batch_size, n_blocks, d_model]

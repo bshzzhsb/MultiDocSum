@@ -152,7 +152,7 @@ if __name__ == '__main__':
     parser.add_argument('-beta2', default=0.998, type=float, help='Param for Adam optimizer')
     parser.add_argument('-warmup_steps', default=8000, type=int,
                         help='The training steps to perform linear learning rate warmup')
-    parser.add_argument('-decay_method', default='noam', type=str, help='The decay method of learning rate')
+    parser.add_argument('-lr_scheduler', default='noam', type=str, help='The decay method of learning rate')
     parser.add_argument('-label_smoothing', default=0.1, type=float, help='Label smoothing in loss compute')
     parser.add_argument('-pos_win', default=2.0, type=float, help='The parameter in graph attention')
 

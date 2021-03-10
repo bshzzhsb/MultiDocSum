@@ -4,10 +4,10 @@
 __pycache__/
 
 # log
-*/log
+log
 
 # tensorboard & model
-*/models
+models
 
 # result
-*/results
+results
