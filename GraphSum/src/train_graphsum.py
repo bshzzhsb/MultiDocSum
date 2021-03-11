@@ -32,6 +32,7 @@ def main(args):
 
 
 def train(args, device):
+    logger.info(args)
     torch.manual_seed(args.random_seed)
     random.seed(args.random_seed)
 
@@ -48,7 +49,7 @@ def train(args, device):
                'PAD': spm.PieceToId('<PAD>'), 'EOT': spm.PieceToId('<T>'),
                'EOP': spm.PieceToId('<P>'), 'EOQ': spm.PieceToId('<Q>'),
                'UNK': spm.PieceToId('<UNK>')}
-    print(symbols)
+    logger.info(symbols)
     vocab_size = len(spm)
 
     def train_iter_fct():

@@ -26,7 +26,7 @@ def build_trainer(args, device, model, symbols, vocab_size, optim, get_test_iter
             dec += param.nelement()
     logger.info('encoder: %d' % enc)
     logger.info('decoder: %d' % dec)
-    logger.info('* number of parameters: %d' % n_params)
+    logger.info('number of parameters: %d' % n_params)
 
     return trainer
 
