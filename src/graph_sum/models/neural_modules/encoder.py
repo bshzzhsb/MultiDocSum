@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-from GraphSum.src.modules.attention import MultiHeadAttention, MultiHeadPooling, MultiHeadStructureAttention
-from GraphSum.src.modules.neural_modules import PositionWiseFeedForward, PreProcessLayer, PostProcessLayer
+from graph_sum.models.neural_modules.attention import MultiHeadAttention, MultiHeadPooling, MultiHeadStructureAttention
+from graph_sum.models.neural_modules.neural_modules import PositionWiseFeedForward, PreProcessLayer, PostProcessLayer
 
 
 class TransformerEncoderLayer(nn.Module):

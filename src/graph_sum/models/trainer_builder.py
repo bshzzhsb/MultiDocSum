@@ -1,10 +1,10 @@
 import os
 import torch
 
-from GraphSum.src.models.loss import build_loss_compute
-from GraphSum.src.utils.logging import logger
-from GraphSum.src.utils.statistics import Statistics
-from GraphSum.src.utils.report_manager import build_report_manager
+from modules.loss import build_loss_compute
+from utils.logging import logger
+from utils.statistics import Statistics
+from utils.report_manager import build_report_manager
 
 
 def build_trainer(args, device, model, symbols, vocab_size, optim, get_test_iter):

@@ -4,10 +4,10 @@ import math
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
-from GraphSum.src.utils.logging import logger
-from GraphSum.src.utils.tensor_util import tile
-from GraphSum.src.models.data_loader import get_num_examples
-from GraphSum.src.utils.cal_rouge import rouge_results_to_str, test_rouge
+from utils.logging import logger
+from utils.tensor_util import tile
+from modules.data_loader import get_num_examples
+from utils.cal_rouge import rouge_results_to_str, test_rouge
 
 
 def build_predictor(args, tokenizer, symbols, model, device):

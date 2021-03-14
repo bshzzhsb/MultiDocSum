@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 
 class ProdLDA(nn.Module):
@@ -9,6 +8,7 @@ class ProdLDA(nn.Module):
     def __init__(self, args):
         super(ProdLDA, self).__init__()
         self.args = args
+        device = args.device
 
         # encoder
         self.encoder1_fc = nn.Linear(args.vocab_size, args.enc1_units)
@@ -24,8 +24,8 @@ class ProdLDA(nn.Module):
         self.decoder = nn.Linear(args.num_topic, args.vocab_size)
         self.decoder_bn = nn.BatchNorm1d(args.vocab_size)
 
-        prior_mean = torch.Tensor(1, args.num_topic).fill_(0)
-        prior_var = torch.Tensor(1, args.num_topic).fill_(args.variance)
+        prior_mean = torch.full([1, args.num_topic], 0, dtype=torch.float32, device=device)
+        prior_var = torch.full([1, args.num_topic], args.variance, dtype=torch.float32, device=device)
         prior_log_var = prior_var.log()
         self.register_buffer('prior_mean', prior_mean)
         self.register_buffer('prior_var', prior_var)

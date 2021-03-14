@@ -4,10 +4,10 @@
 __pycache__/
 
 # log
-log
+/log
 
 # tensorboard & model
-/GraphSum/models/
+/models
 
 # result
-results
+/results

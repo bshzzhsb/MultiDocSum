@@ -4,11 +4,11 @@ import random
 import sentencepiece
 import os
 
-from GraphSum.src.models.data_loader import Dataloader, load_dataset
-from GraphSum.src.models.model import GraphSum
+from modules.data_loader import DataLoader, load_dataset
+from graph_sum.models.model import GraphSum
 from modules.optimizer import build_optim
-from GraphSum.src.models.trainer_builder import build_trainer
-from GraphSum.src.models.predictor_builder import build_predictor
+from graph_sum.models.trainer_builder import build_trainer
+from graph_sum.models.predictor_builder import build_predictor
 
 from utils.logging import init_logger, logger
 
@@ -53,11 +53,11 @@ def train(args, device):
     vocab_size = len(spm)
 
     def train_iter_fct():
-        return Dataloader(args, load_dataset(args, 'train', shuffle=True), symbols,
+        return DataLoader(args, load_dataset(args, 'train', shuffle=True), symbols,
                           args.batch_size, device, shuffle=True, is_test=False)
 
     def get_test_iter():
-        return Dataloader(args, load_dataset(args, 'test', shuffle=False), symbols,
+        return DataLoader(args, load_dataset(args, 'test', shuffle=False), symbols,
                           args.batch_size, device, shuffle=False, is_test=True)
 
     model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
@@ -97,7 +97,7 @@ def test(args, device):
     )
     model.eval()
 
-    test_iter = Dataloader(args, load_dataset(args, 'test', shuffle=False), symbols,
+    test_iter = DataLoader(args, load_dataset(args, 'test', shuffle=False), symbols,
                            args.batch_size, device, shuffle=False, is_test=True)
     predictor = build_predictor(args, spm, symbols, model, device)
     predictor.translate(test_iter, step)

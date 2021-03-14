@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from GraphSum.src.utils.statistics import Statistics
+from utils.statistics import Statistics
 
 
 def build_loss_compute(symbols, vocab_size, device, train=True, label_smoothing=0.0):

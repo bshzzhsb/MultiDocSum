@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 import json
 import glob
@@ -10,9 +9,7 @@ import numpy as np
 from datetime import datetime
 from tensorboardX import SummaryWriter
 
-o_path = os.getcwd()
-sys.path.append(o_path)
-from models.lda.LDA import ProdLDA
+from models.lda import ProdLDA
 from utils.logging import init_logger, logger
 from modules.optimizer import build_optim
 
@@ -53,6 +50,7 @@ def data_loader():
             for src in item['src']:
                 batch.append(_to_onehot(src, args.vocab_size))
                 if len(batch) == args.batch_size:
+                    batch = np.array(batch)
                     yield torch.tensor(batch, dtype=torch.float32)
                     batch = []
 

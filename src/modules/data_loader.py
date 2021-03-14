@@ -5,7 +5,7 @@ import gc
 import numpy as np
 import torch
 
-from GraphSum.src.utils.logging import logger
+from utils.logging import logger
 
 
 def chunks(l, n):
@@ -217,7 +217,7 @@ def get_num_examples(data_path, phase):
     return num
 
 
-class Dataloader(object):
+class DataLoader(object):
 
     def __init__(self, args, datasets, symbols, batch_size, device,
                  shuffle, is_test, random_seed=None):
