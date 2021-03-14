@@ -5,7 +5,7 @@ from torch.nn.utils import clip_grad_norm_
 
 def build_optim(args, model, checkpoint):
     optimizer = Optimizer(
-        args.optim, args.lr, args.max_grad_norm,
+        args.optimizer, args.lr, args.max_grad_norm,
         beta1=args.beta1, beta2=args.beta2,
         lr_scheduler=args.lr_scheduler,
         warmup_steps=args.warmup_steps,
@@ -15,7 +15,7 @@ def build_optim(args, model, checkpoint):
 
     optimizer.set_parameters(list(model.named_parameters()))
 
-    if args.checkpoint != '':
+    if checkpoint:
         optimizer.optimizer.load_state_dict(checkpoint['optim'])
         optimizer._step = checkpoint['step']
         if args.use_cuda:

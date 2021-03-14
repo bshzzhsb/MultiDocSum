@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from modules.attention_module import \
+from GraphSum.src.modules.attention_module import \
     ScaledDotProductAttention, DotProductPooling, \
     GraphScaledDotProductAttention, \
     GraphScaledDotProductAttentionWithMask, \

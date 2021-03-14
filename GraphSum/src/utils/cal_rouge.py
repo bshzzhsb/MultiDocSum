@@ -3,7 +3,7 @@ import time
 from pyrouge import Rouge155
 from multiprocessing import Pool
 
-from utils.logging import logger
+from GraphSum.src.utils.logging import logger
 
 
 def process(data):

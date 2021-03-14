@@ -4,11 +4,11 @@ import random
 import sentencepiece
 import os
 
-from models.data_loader import Dataloader, load_dataset
-from models.model import GraphSum
-from models.optimizer import build_optim
-from models.trainer_builder import build_trainer
-from models.predictor_builder import build_predictor
+from GraphSum.src.models.data_loader import Dataloader, load_dataset
+from GraphSum.src.models.model import GraphSum
+from GraphSum.src.models.optimizer import build_optim
+from GraphSum.src.models.trainer_builder import build_trainer
+from GraphSum.src.models.predictor_builder import build_predictor
 
 from utils.logging import init_logger, logger
 
@@ -72,6 +72,7 @@ def train(args, device):
 
 
 def test(args, device):
+    logger.info(args)
     assert args.checkpoint != ''
 
     step = int(args.checkpoint.split('.')[-2].split('_')[-1])
@@ -112,8 +113,7 @@ if __name__ == '__main__':
     parser.add_argument('-data_path', default='../../../data/MultiNews', type=str, help='Path to data')
     parser.add_argument('-model_path', default='../models', type=str, help='Path to save model')
     parser.add_argument('-checkpoint', default='', type=str, help='Path to checkpoint')
-    parser.add_argument('-vocab_path', default='../spm/spm9998_3.model', type=str, help='Path to sentencepiece model')
-    parser.add_argument('-config_path', default='../config/config.json', type=str, help='Path to config')
+    parser.add_argument('-vocab_path', default='../../spm/spm9998_3.model', type=str, help='Path to sentencepiece model')
 
     parser.add_argument('-max_para_num', default=30, type=int,
                         help='Max number of paragraphs of the longest input documents')
@@ -127,7 +127,7 @@ if __name__ == '__main__':
                         help='If True, batch size will be the maximum number of tokens in one batch.'
                              'else, batch size will be the maximum number of examples in one batch')
 
-    parser.add_argument('-optim', default='adam', type=str, help='The optimizer used in training')
+    parser.add_argument('-optimizer', default='adam', type=str, help='The optimizer used in training')
     parser.add_argument('-lr', default=3, type=float, help='Learning rate of the model in training')
     parser.add_argument('-max_grad_norm', default=2.0, type=float, help='The max gradient norm')
     parser.add_argument('-random_seed', default=0, type=int, help='Random seed')

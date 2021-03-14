@@ -2,7 +2,7 @@ import math
 import sys
 import time
 
-from utils.logging import logger
+from GraphSum.src.utils.logging import logger
 
 
 class Statistics(object):

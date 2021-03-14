@@ -3,3 +3,4 @@ torch
 tensorboardX
 pyrouge
 tqdm
+scikit-learn

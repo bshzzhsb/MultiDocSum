@@ -5,7 +5,7 @@ import gc
 import numpy as np
 import torch
 
-from utils.logging import logger
+from GraphSum.src.utils.logging import logger
 
 
 def chunks(l, n):

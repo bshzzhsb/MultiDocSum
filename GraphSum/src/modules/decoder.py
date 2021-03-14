@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-from modules.attention import MultiHeadAttention, MultiHeadHierarchicalAttention
-from modules.neural_modules import PositionWiseFeedForward, PreProcessLayer, PostProcessLayer
+from GraphSum.src.modules.attention import MultiHeadAttention, MultiHeadHierarchicalAttention
+from GraphSum.src.modules.neural_modules import PositionWiseFeedForward, PreProcessLayer, PostProcessLayer
 
 
 class TransformerDecoderLayer(nn.Module):
