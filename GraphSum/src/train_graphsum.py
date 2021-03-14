@@ -6,7 +6,7 @@ import os
 
 from GraphSum.src.models.data_loader import Dataloader, load_dataset
 from GraphSum.src.models.model import GraphSum
-from GraphSum.src.models.optimizer import build_optim
+from modules.optimizer import build_optim
 from GraphSum.src.models.trainer_builder import build_trainer
 from GraphSum.src.models.predictor_builder import build_predictor
 

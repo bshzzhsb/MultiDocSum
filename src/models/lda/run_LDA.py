@@ -3,14 +3,10 @@ import sys
 import argparse
 import json
 import glob
-import math
-import time
 import gc
 import sentencepiece
 import torch
-import torch.nn as nn
 import numpy as np
-from tqdm import tqdm
 from datetime import datetime
 from tensorboardX import SummaryWriter
 
@@ -18,7 +14,7 @@ o_path = os.getcwd()
 sys.path.append(o_path)
 from models.lda.LDA import ProdLDA
 from utils.logging import init_logger, logger
-from GraphSum.src.models.optimizer import build_optim
+from modules.optimizer import build_optim
 
 
 def get_num_example():
