@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import json
 import glob
@@ -13,6 +14,8 @@ from tqdm import tqdm
 from datetime import datetime
 from tensorboardX import SummaryWriter
 
+o_path = os.getcwd()
+sys.path.append(o_path)
 from models.lda.LDA import ProdLDA
 from utils.logging import init_logger, logger
 from GraphSum.src.models.optimizer import build_optim
