@@ -94,7 +94,7 @@ def train(model, gen_data_iter, optimizer):
             loss_epoch += loss
             if step % args.report_every == 0:
                 writer.add_scalar('train/loss', loss, step)
-                logger.info('Step {}, loss {}'.format(step, loss))
+                logger.info('Step {}, loss {}, lr: {}'.format(step, loss, optimizer.learning_rate))
             step += 1
         data_iter = gen_data_iter()
 
@@ -110,21 +110,20 @@ def train(model, gen_data_iter, optimizer):
 
 
 def main():
+    log_dir = args.log_path + '/' + args.mode + datetime.now().strftime('-%b-%d_%H-%M-%S.log')
+    init_logger(log_dir)
     logger.info(args)
     torch.manual_seed(args.random_seed)
 
     args.device = 'cuda' if args.use_cuda else 'cpu'
     # epoch_steps = math.ceil(get_num_example()[0] / args.batch_size)
     epoch_steps = 20000
-    args.train_steps = args.num_epoch * epoch_steps
+    args.train_steps = args.epochs * epoch_steps
     args.warmup_steps = args.train_steps * 0.1
 
     spm = sentencepiece.SentencePieceProcessor()
     spm.Load(args.vocab_path)
     args.vocab_size = len(spm)
-
-    log_dir = args.log_path + '/' + args.mode + datetime.now().strftime('-%b-%d_%H-%M-%S.log')
-    init_logger(log_dir)
 
     model = model_builder()
     optimizer = build_optim(args, model, checkpoint=None)
@@ -133,10 +132,10 @@ def main():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='../../../../data/MultiNews')
-    parser.add_argument('--vocab_path', type=str, default='../../../spm/spm9998_3.model')
-    parser.add_argument('--log_path', type=str, default='../../../log')
-    parser.add_argument('--model_path', type=str, default='../../../model')
+    parser.add_argument('--data_path', type=str, default='../../data/MultiNews')
+    parser.add_argument('--vocab_path', type=str, default='../spm/spm9998_3.model')
+    parser.add_argument('--log_path', type=str, default='../log')
+    parser.add_argument('--model_path', type=str, default='../models')
 
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--report_every', type=str, default=100)
@@ -152,7 +151,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_grad_norm', type=float, default=2.0)
     parser.add_argument('--beta1', type=float, default=0.99)
     parser.add_argument('--beta2', type=float, default=0.999)
-    parser.add_argument('--num_epoch', type=int, default=80)
+    parser.add_argument('--epochs', type=int, default=80)
     parser.add_argument('--init_mult', type=float, default=1.0)
     parser.add_argument('--variance', type=float, default=0.995)
     parser.add_argument('--dropout', type=float, default=0.1)

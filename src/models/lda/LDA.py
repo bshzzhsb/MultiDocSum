@@ -34,10 +34,6 @@ class ProdLDA(nn.Module):
         if args.init_mult != 0:
             self.decoder.weight.data.uniform_(0, args.init_mult)
 
-        # self.log_var_bn.register_parameter('weight', None)
-        # self.mean_bn.register_parameter('weight', None)
-        # self.decoder_bn.register_parameter('weight', None)
-
     def forward(self, enc_input):
         enc1 = F.softplus(self.encoder1_fc(enc_input))
         enc2 = F.softplus(self.encoder2_fc(enc1))

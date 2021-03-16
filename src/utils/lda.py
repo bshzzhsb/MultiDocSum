@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer
 
-from graph_sum.utils import init_logger, logger
+from utils.logger import init_logger, logger
 
 
 def to_onehot(data, min_len):
