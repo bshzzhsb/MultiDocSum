@@ -104,7 +104,7 @@ def train(model, gen_data_iter, optimizer):
     checkpoint = {
         'model': model.state_dict(),
         'opt': args,
-        'optim': optimizer.state_dict()
+        'optim': optimizer.optimizer.state_dict()
     }
     checkpoint_path = os.path.join(args.model_path, '/prodlda_model.pt')
     logger.info('Saving checkpoint %s' % checkpoint_path)
