@@ -3,6 +3,7 @@ import glob
 import numpy as np
 import sentencepiece
 import pickle
+import argparse
 from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer
 
@@ -43,7 +44,7 @@ def train_sklearn_lda(data_path, spm):
             for item in data['src']:
                 train_set.append(spm.DecodeIdsWithCheck(item))
 
-    vectorizer = CountVectorizer(max_df=0.6, min_df=0.05)
+    vectorizer = CountVectorizer(max_df=args.max_df, min_df=args.min_df)
     train_set = vectorizer.fit_transform(train_set)
     vocab = vectorizer.get_feature_names()
 
@@ -61,9 +62,9 @@ def train_sklearn_lda(data_path, spm):
 
 
 def main():
-    data_path = '../../../data/MultiNews'
-    logger_file = '../../log/lda.log'
-    vocab_path = '../../spm/spm9998_3.model'
+    data_path = args.data_path
+    logger_file = args.log_file
+    vocab_path = args.vocab_path
 
     init_logger(logger_file)
 
@@ -75,4 +76,14 @@ def main():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_path', default='../../data/MultiNews', type=str)
+    parser.add_argument('--vocab_path', default='../spm/spm9998_3.model', type=str)
+    parser.add_argument('--log_file', default='../log/lda.log', type=str)
+    parser.add_argument('--model_path', default='../models', type=str)
+    parser.add_argument('--checkpoint', default=None, type=str)
+
+    parser.add_argument('--max_df', default=0.3, type=float)
+    parser.add_argument('--min_df', default=0.001, type=float)
+    args = parser.parse_args()
     main()
