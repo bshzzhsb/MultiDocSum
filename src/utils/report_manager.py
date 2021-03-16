@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from graph_sum.utils import logger
-from graph_sum.utils import Statistics
+from utils.logger import logger
+from utils.statistics import Statistics
 
 
 def build_report_manager(report_every, tensorboard_log_dir, tensorboard=True):

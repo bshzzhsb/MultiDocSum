@@ -5,7 +5,7 @@ import gc
 import numpy as np
 import torch
 
-from utils.logging import logger
+from utils.logger import logger
 
 
 def chunks(l, n):

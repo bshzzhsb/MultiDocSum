@@ -10,7 +10,7 @@ from datetime import datetime
 from tensorboardX import SummaryWriter
 
 from models.lda import ProdLDA
-from utils.logging import init_logger, logger
+from utils.logger import init_logger, logger
 from modules.optimizer import build_optim
 
 

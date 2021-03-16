@@ -2,7 +2,7 @@ import os
 import torch
 
 from modules.loss import build_loss_compute
-from utils.logging import logger
+from utils.logger import logger
 from utils.statistics import Statistics
 from utils.report_manager import build_report_manager
 

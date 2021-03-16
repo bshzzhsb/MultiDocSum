@@ -4,7 +4,7 @@ import math
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
-from utils.logging import logger
+from utils.logger import logger
 from utils.tensor_util import tile
 from modules.data_loader import get_num_examples
 from utils.cal_rouge import rouge_results_to_str, test_rouge

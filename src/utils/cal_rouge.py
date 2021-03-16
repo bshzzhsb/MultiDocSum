@@ -3,7 +3,7 @@ import time
 from pyrouge import Rouge155
 from multiprocessing import Pool
 
-from utils.logging import logger
+from utils.logger import logger
 
 
 def process(data):
