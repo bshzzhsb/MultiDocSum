@@ -29,7 +29,7 @@ def get_num_example():
     return len_src, len_tgt
 
 
-def data_loader():
+def data_loader(phase='*'):
     data_path = args.data_path
 
     def _lazy_dataset_loader(pt_file):
@@ -40,7 +40,7 @@ def data_loader():
     def _to_onehot(dataset, min_len):
         return np.bincount(dataset, minlength=min_len)
 
-    pts = sorted(glob.glob(data_path + '/*/*.[0-9]*.json'))
+    pts = sorted(glob.glob(data_path + '/' + phase + '/*.[0-9]*.json'))
     assert len(pts) > 0
     np.random.shuffle(pts)
 
@@ -67,19 +67,26 @@ def optimizer_builder(model):
         return optimizer
 
 
-def model_builder():
-    model = ProdLDA(args)
+def model_builder(checkpoint=None):
+    model = ProdLDA(args, checkpoint=checkpoint)
     if args.use_cuda:
         model = model.cuda()
     return model
 
 
-def train(model, gen_data_iter, optimizer):
+def train():
+    epoch_steps = math.ceil(get_num_example()[0] / args.batch_size)
+    args.train_steps = args.epochs * epoch_steps
+    logger.info('num steps: {}'.format(args.train_steps))
+
+    model = model_builder()
+    args.warmup_steps = None
+    optimizer = build_optim(args, model, checkpoint=None)
     tensorboard_dir = args.log_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
     writer = SummaryWriter(tensorboard_dir)
 
     model.train()
-    data_iter = gen_data_iter()
+    data_iter = data_loader()
     step = 1
     while step <= args.train_steps:
         len_data = 0
@@ -98,18 +105,38 @@ def train(model, gen_data_iter, optimizer):
                 logger.info('Step {}, loss {}, lr: {}'.format(step, loss, optimizer.learning_rate))
             step += 1
         epoch_steps = args.train_steps / args.epochs
-        logger.info('Epoch {}, average epoch loss {}'.format(step / epoch_steps + 1, loss_epoch / epoch_steps))
-        data_iter = gen_data_iter()
+        logger.info('Epoch {}, average epoch loss {}'.format(step / epoch_steps, loss_epoch / epoch_steps))
+        data_iter = data_loader()
 
     checkpoint = {
         'model': model.state_dict(),
         'opt': args,
         'optim': optimizer.optimizer.state_dict()
     }
-    checkpoint_path = os.path.join(args.model_path, '/prodlda_model.pt')
+    checkpoint_path = os.path.join(args.model_path, 'prodlda_model.pt')
     logger.info('Saving checkpoint %s' % checkpoint_path)
     if not os.path.exists(checkpoint_path):
         torch.save(checkpoint, checkpoint_path)
+
+
+def test(spm):
+    assert args.checkpoint is not None
+
+    logger.info('Loading checkpoint from %s' % args.checkpoint)
+    checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
+
+    model = model_builder(checkpoint)
+    model.eval()
+
+    emb = model.decoder.weight.detach().numpy().T
+    print_top_words(emb, spm)
+
+
+def print_top_words(beta, spm, n_top_words=10):
+    logger.info('----------The Topics----------')
+    for i in range(len(beta)):
+        logger.info(spm.DecodeIds([int(idx) for idx in beta[i].argsort()[: -n_top_words - 1: -1]]))
+    logger.info('----------End of Topics----------')
 
 
 def main():
@@ -118,19 +145,17 @@ def main():
     logger.info(args)
     torch.manual_seed(args.random_seed)
 
-    args.device = 'cuda' if args.use_cuda else 'cpu'
-    epoch_steps = math.ceil(get_num_example()[0] / args.batch_size)
-    args.train_steps = args.epochs * epoch_steps
-    logger.info('num steps: {}'.format(args.train_steps))
-
     spm = sentencepiece.SentencePieceProcessor()
     spm.Load(args.vocab_path)
     args.vocab_size = len(spm)
 
-    model = model_builder()
-    args.warmup_steps = None
-    optimizer = build_optim(args, model, checkpoint=None)
-    train(model, data_loader, optimizer)
+    args.device = 'cuda' if args.use_cuda else 'cpu'
+
+    if args.mode == 'train':
+        train()
+
+    elif args.mode == 'test':
+        test(spm)
 
 
 if __name__ == '__main__':
@@ -139,6 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('--vocab_path', default='../spm/spm9998_3.model', type=str)
     parser.add_argument('--log_path', default='../log', type=str)
     parser.add_argument('--model_path', default='../models', type=str)
+    parser.add_argument('--checkpoint', default=None, type=str)
 
     parser.add_argument('--mode', default='train', type=str)
     parser.add_argument('--report_every', default=100, type=str)

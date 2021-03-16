@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 class ProdLDA(nn.Module):
 
-    def __init__(self, args):
+    def __init__(self, args, checkpoint=None):
         super(ProdLDA, self).__init__()
         self.args = args
         device = args.device
@@ -33,6 +33,9 @@ class ProdLDA(nn.Module):
 
         if args.init_mult != 0:
             self.decoder.weight.data.uniform_(0, args.init_mult)
+
+        if checkpoint is not None:
+            self.load_state_dict(checkpoint['model'], strict=True)
 
     def forward(self, enc_input):
         enc1 = F.softplus(self.encoder1_fc(enc_input))
