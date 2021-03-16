@@ -1,4 +1,5 @@
 import os
+import math
 import argparse
 import json
 import glob
@@ -79,7 +80,7 @@ def train(model, gen_data_iter, optimizer):
 
     model.train()
     data_iter = gen_data_iter()
-    step = 0
+    step = 1
     while step <= args.train_steps:
         len_data = 0
         loss_epoch = 0.0
@@ -96,6 +97,8 @@ def train(model, gen_data_iter, optimizer):
                 writer.add_scalar('train/loss', loss, step)
                 logger.info('Step {}, loss {}, lr: {}'.format(step, loss, optimizer.learning_rate))
             step += 1
+        epoch_steps = args.train_steps / args.epochs
+        logger.info('Epoch {}, average epoch loss {}'.format(step / epoch_steps + 1, loss_epoch / epoch_steps))
         data_iter = gen_data_iter()
 
     checkpoint = {
@@ -116,17 +119,16 @@ def main():
     torch.manual_seed(args.random_seed)
 
     args.device = 'cuda' if args.use_cuda else 'cpu'
-    # epoch_steps = math.ceil(get_num_example()[0] / args.batch_size)
-    epoch_steps = 20000
+    epoch_steps = math.ceil(get_num_example()[0] / args.batch_size)
     args.train_steps = args.epochs * epoch_steps
-    args.warmup_steps = args.train_steps * 0.
-    logger.info('num steps: {}, warmup steps: {}'.format(args.train_steps, args.warmup_steps))
+    logger.info('num steps: {}'.format(args.train_steps))
 
     spm = sentencepiece.SentencePieceProcessor()
     spm.Load(args.vocab_path)
     args.vocab_size = len(spm)
 
     model = model_builder()
+    args.warmup_steps = None
     optimizer = build_optim(args, model, checkpoint=None)
     train(model, data_loader, optimizer)
 
@@ -148,7 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--optimizer', default='Adam', type=str)
     parser.add_argument('--lr', default=2e-3, type=float)
-    parser.add_argument('--lr_scheduler', default='linear_warmup_decay', type=str)
+    parser.add_argument('--lr_scheduler', default='', type=str)
     parser.add_argument('--max_grad_norm', default=2.0, type=float)
     parser.add_argument('--beta1', default=0.99, type=float)
     parser.add_argument('--beta2', default=0.999, type=float)
