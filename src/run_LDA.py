@@ -91,7 +91,7 @@ def train(model, gen_data_iter, optimizer):
             loss.backward()
             optimizer.step()
             gc.collect()
-            loss_epoch += loss
+            loss_epoch += loss.item()
             if step % args.report_every == 0:
                 writer.add_scalar('train/loss', loss, step)
                 logger.info('Step {}, loss {}, lr: {}'.format(step, loss, optimizer.learning_rate))
@@ -110,7 +110,7 @@ def train(model, gen_data_iter, optimizer):
 
 
 def main():
-    log_dir = args.log_path + '/' + args.mode + datetime.now().strftime('-%b-%d_%H-%M-%S.log')
+    log_dir = os.path.join(args.log_path, args.mode + datetime.now().strftime('-%b-%d_%H-%M-%S.log'))
     init_logger(log_dir)
     logger.info(args)
     torch.manual_seed(args.random_seed)
@@ -119,7 +119,8 @@ def main():
     # epoch_steps = math.ceil(get_num_example()[0] / args.batch_size)
     epoch_steps = 20000
     args.train_steps = args.epochs * epoch_steps
-    args.warmup_steps = args.train_steps * 0.1
+    args.warmup_steps = args.train_steps * 0.
+    logger.info('num steps: {}, warmup steps: {}'.format(args.train_steps, args.warmup_steps))
 
     spm = sentencepiece.SentencePieceProcessor()
     spm.Load(args.vocab_path)
@@ -132,29 +133,29 @@ def main():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='../../data/MultiNews')
-    parser.add_argument('--vocab_path', type=str, default='../spm/spm9998_3.model')
-    parser.add_argument('--log_path', type=str, default='../log')
-    parser.add_argument('--model_path', type=str, default='../models')
+    parser.add_argument('--data_path', default='../../data/MultiNews', type=str)
+    parser.add_argument('--vocab_path', default='../spm/spm9998_3.model', type=str)
+    parser.add_argument('--log_path', default='../log', type=str)
+    parser.add_argument('--model_path', default='../models', type=str)
 
-    parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('--report_every', type=str, default=100)
-    parser.add_argument('--random_seed', type=int, default=0)
-    parser.add_argument('--hidden_size', type=int, default=256)
-    parser.add_argument('--enc1_units', type=int, default=256)
-    parser.add_argument('--enc2_units', type=int, default=256)
-    parser.add_argument('--num_topic', type=int, default=50)
-    parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--optimizer', type=str, default='Adam')
-    parser.add_argument('--lr', type=float, default=2e-3)
-    parser.add_argument('--lr_scheduler', type=str, default='linear_warmup_decay')
-    parser.add_argument('--max_grad_norm', type=float, default=2.0)
-    parser.add_argument('--beta1', type=float, default=0.99)
-    parser.add_argument('--beta2', type=float, default=0.999)
-    parser.add_argument('--epochs', type=int, default=80)
-    parser.add_argument('--init_mult', type=float, default=1.0)
-    parser.add_argument('--variance', type=float, default=0.995)
-    parser.add_argument('--dropout', type=float, default=0.1)
+    parser.add_argument('--mode', default='train', type=str)
+    parser.add_argument('--report_every', default=100, type=str)
+    parser.add_argument('--random_seed', default=0, type=int)
+    parser.add_argument('--hidden_size', default=256, type=int)
+    parser.add_argument('--enc1_units', default=256, type=int)
+    parser.add_argument('--enc2_units', default=256, type=int)
+    parser.add_argument('--num_topic', default=50, type=int)
+    parser.add_argument('--batch_size', default=64, type=int)
+    parser.add_argument('--optimizer', default='Adam', type=str)
+    parser.add_argument('--lr', default=2e-3, type=float)
+    parser.add_argument('--lr_scheduler', default='linear_warmup_decay', type=str)
+    parser.add_argument('--max_grad_norm', default=2.0, type=float)
+    parser.add_argument('--beta1', default=0.99, type=float)
+    parser.add_argument('--beta2', default=0.999, type=float)
+    parser.add_argument('--epochs', default=80, type=int)
+    parser.add_argument('--init_mult', default=1.0, type=float)
+    parser.add_argument('--variance', default=0.995, type=float)
+    parser.add_argument('--dropout', default=0.1, type=float)
     parser.add_argument('--start', action='store_true')
     parser.add_argument('--use_cuda', action='store_true')
     args = parser.parse_args()
