@@ -103,18 +103,12 @@ def model_builder(checkpoint=None):
 
 
 def train(spm):
-    model = model_builder()
-    args.warmup_steps = None
-    optimizer = build_optim(args, model, checkpoint=None)
-    tensorboard_dir = args.log_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
-    writer = SummaryWriter(tensorboard_dir)
-
     dataset, vocab = gen_dataset(spm)
 
     with open('../spm/vocab.pt', 'wb') as file:
         pickle.dump(vocab, file)
         file.close()
-    
+
     len_dataset = len(dataset)
     all_indices = list(range(len_dataset))
     np.random.shuffle(all_indices)
@@ -123,6 +117,12 @@ def train(spm):
     epoch_steps = math.ceil(len_dataset / batch_size)
     args.train_steps = args.epochs * epoch_steps
     logger.info('num steps: {}'.format(args.train_steps))
+
+    model = model_builder()
+    args.warmup_steps = None
+    optimizer = build_optim(args, model, checkpoint=None)
+    tensorboard_dir = args.log_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
+    writer = SummaryWriter(tensorboard_dir)
 
     model.train()
     step = 1

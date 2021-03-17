@@ -87,3 +87,61 @@ if __name__ == '__main__':
     parser.add_argument('--min_df', default=0.001, type=float)
     args = parser.parse_args()
     main()
+
+    # from utils.logger import init_logger, logger
+    # from utils.cal_rouge import test_rouge, rouge_results_to_str
+    #
+    # init_logger('../log/predict_torch_sc_my.log')
+    #
+    # candi = open('../results/graph_sum/res.candidate')
+    # ref = open('../results/graph_sum/res.gold')
+    # result_dict = test_rouge(candi, ref, 1)
+    #
+    # logger.info('Rouges %s' % (rouge_results_to_str(result_dict)))
+
+    # pred_file = open('../results/graph_sum/official_paddle.candidate', 'r', encoding='utf-8')
+    # gold_file = open('../results/graph_sum/official_paddle.gold', 'r', encoding='utf-8')
+    #
+    # out_pred_file = open('../results/graph_sum/official.candidate', 'w', encoding='utf-8')
+    # out_gold_file = open('../results/graph_sum/official.gold', 'w', encoding='utf-8')
+    #
+    # preds = pred_file.readlines()
+    # golds = gold_file.readlines()
+    #
+    # for pred, gold in zip(preds, golds):
+    #     pred_str = pred.replace('<q>', ' ').replace(' +', ' ') \
+    #         .replace('<unk>', 'UNK').replace('\\', '').strip()
+    #     gold_str = gold.replace('<t>', '').replace('</t>', '') \
+    #         .replace('<q>', ' ').replace(' +', ' ').replace('\\', '').strip()
+    #
+    #     out_pred_file.write(pred_str + '\n')
+    #     out_gold_file.write(gold_str + '\n')
+    #
+    # pred_file.close()
+    # gold_file.close()
+    # out_pred_file.close()
+    # out_gold_file.close()
+
+    # pred_file = open('../results/graph_sum/sc_pos_embed_lr_3_step_160000/results/res.160000.candidate',
+    #                  'r', encoding='utf-8')
+    # gold_file = open('../results/graph_sum/sc_pos_embed_lr_3_step_160000/results/res.160000.gold',
+    #                  'r', encoding='utf-8')
+    # out_pred_file = open('../results/graph_sum/res.candidate', 'w', encoding='utf-8')
+    # out_gold_file = open('../results/graph_sum/res.gold', 'w', encoding='utf-8')
+    # preds = pred_file.readlines()
+    # golds = gold_file.readlines()
+    #
+    # for pred, gold in zip(preds, golds):
+    #     pred_str = pred.replace(' ##', '').replace('<S>', '').replace('</S>', '').replace('<Q>', '<q>') \
+    #         .replace('<P>', ' ').replace('<T>', '').replace('<PAD>', '').replace(' ⁇ ', ''). \
+    #         replace('⁇ ', '').replace(' ⁇', '').strip(' \n"')
+    #     gold_str = gold.replace(' ##', '').replace('<S>', '').replace('</S>', '').replace('<Q>', '<q>') \
+    #         .replace('<P>', ' ').replace('<T>', '').replace('<PAD>', '').replace(' ⁇ ', ''). \
+    #         replace('⁇ ', '').replace(' ⁇', '').strip(' \n"')
+    #     out_pred_file.write(pred_str + '\n')
+    #     out_gold_file.write(gold_str + '\n')
+    #
+    # pred_file.close()
+    # gold_file.close()
+    # out_pred_file.close()
+    # out_gold_file.close()
