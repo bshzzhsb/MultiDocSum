@@ -106,38 +106,38 @@ class DataBatch(object):
         return rtn_data
 
     def _pad_src_batch_data(self, insts, graphs, device):
-        # [batch_size, max_n_blocks, max_n_tokens]
+        # [batch_size, n_blocks, n_tokens]
         src_words = [self._pad(inst, self.max_para_num, self.max_para_len, self.pad_idx)
                      for inst in insts]
         src_words = torch.tensor(src_words, dtype=torch.int64, device=device)
 
-        # [batch_size, max_n_blocks, max_n_tokens]
+        # [batch_size, n_blocks, n_tokens]
         src_words_pos = [[list(range(0, len(para))) + [0] * (self.max_para_len - len(para))
                           for para in inst] +
                          [[0] * self.max_para_len] * (self.max_para_num - len(inst))
                          for inst in insts]
         src_words_pos = torch.tensor(src_words_pos, dtype=torch.int64, device=device)
 
-        # [batch_size, max_n_blocks]
+        # [batch_size, n_blocks]
         src_sents_pos = [list(range(0, len(inst))) + [0] * (self.max_para_num - len(inst))
                          for inst in insts]
         src_sents_pos = torch.tensor(src_sents_pos, dtype=torch.int64, device=device)
 
         # 在 paddings 上不计算 attention
-        # [batch_size, max_n_blocks, max_n_tokens]
+        # [batch_size, n_blocks, n_tokens]
         src_words_self_attn_bias = [[[0.0] * len(para) + [-1e18] * (self.max_para_len - len(para))
                                      for para in inst] +
                                     [[-1e18] * self.max_para_len] * (self.max_para_num - len(inst))
                                     for inst in insts]
         src_words_self_attn_bias = torch.tensor(src_words_self_attn_bias, dtype=torch.float32, device=device)
 
-        # [batch_size, max_n_blocks]
+        # [batch_size, n_blocks]
         src_sents_self_attn_bias = [[0.0] * len(inst) + [-1e18] * (self.max_para_num - len(inst))
                                     for inst in insts]
         src_sents_self_attn_bias = torch.tensor(src_sents_self_attn_bias, dtype=torch.float32, device=device)
 
         graphs = [[[1.0 - float(sim) for sim in list(row)] for row in g] for g in graphs]
-        # [batch_size, max_n_blocks, max_n_blocks]
+        # [batch_size, n_blocks, n_blocks]
         graph_attn_bias = [self._pad(g, self.max_para_num, self.max_para_num, 1.0) for g in graphs]
         graph_attn_bias = torch.tensor(graph_attn_bias, dtype=torch.float32, device=device)
 

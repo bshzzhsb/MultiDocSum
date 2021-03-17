@@ -77,7 +77,7 @@ class MultiHeadAttention(nn.Module):
 
         q = shape(q)
 
-        # [batch_size, n_heads, len_q, d_v] [batch_size, n_heads, len_q, len_k]
+        # [batch_size, n_heads, len_q, d_v]
         out = self.attn(q, k, v, bias)
 
         # [batch_size, len_q, d_model]
@@ -211,6 +211,7 @@ class MultiHeadHierarchicalAttention(nn.Module):
         :param bias_w: [batch_size, n_blocks, n_heads, seq_len, n_tokens]
         :param bias_s: [batch_size, n_heads, seq_len, n_blocks]
         :param graph_attn_bias: [batch_size, n_heads, n_blocks, n_blocks]
+        :return: [batch_size, len_q, d_model]
         d_model = dim_embed = n_heads * d_k = n_heads * d_v
         len_k_s = len_v_s = len_k_w = len_v_w = n_blocks
         """

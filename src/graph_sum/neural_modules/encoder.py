@@ -74,6 +74,7 @@ class TransformerEncoder(nn.Module):
     def forward(self, enc_input, bias):
         """
         :param enc_input: [batch_size, n_blocks, d_model]
+        :param bias: [batch_size * n_blocks, n_heads, n_tokens, n_tokens]
         :return: [batch_size, n_blocks, d_model]
         """
         for i in range(self.n_layers):

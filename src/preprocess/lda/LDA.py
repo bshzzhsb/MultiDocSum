@@ -37,19 +37,34 @@ class ProdLDA(nn.Module):
         if checkpoint is not None:
             self.load_state_dict(checkpoint['model'], strict=True)
 
+        self.to(device)
+
+    def encode(self, enc_input):
+
+
     def forward(self, enc_input):
+        """
+        :param enc_input: [batch_size, vocab_size]
+        """
+        # [batch_size, enc1_unit]
         enc1 = F.softplus(self.encoder1_fc(enc_input))
+        # [batch_size, enc2_unit]
         enc2 = F.softplus(self.encoder2_fc(enc1))
         enc2 = self.encoder2_drop(enc2)
+
+        # [batch_size, num_topic]
         posterior_mean = self.mean_bn(self.mean_fc(enc2))
+        # [batch_size, num_topic]
         posterior_log_var = self.log_var_bn(self.log_var_fc(enc2))
         posterior_var = posterior_log_var.exp()
+        # [batch_size, num_topic]
         eps = enc_input.clone().resize_as_(posterior_mean).normal_().requires_grad_(True)
-        # eps = torch.tensor(enc_input.data.new().resize_as_(posterior_mean.data).normal_(), requires_grad=True)
+        # [batch_size, num_topic]
         z = posterior_mean + posterior_var.sqrt() * eps
         p = F.softmax(z, dim=-1)
         p = self.p_drop(p)
 
+        # [batch_size, vocab_size]
         recon = F.softmax(self.decoder_bn(self.decoder(p)), dim=-1)
 
         return recon, self.loss(

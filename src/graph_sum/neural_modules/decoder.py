@@ -99,11 +99,14 @@ class GraphDecoderLayer(nn.Module):
     def forward(self, dec_input, enc_words_output, enc_sents_output, self_attn_bias,
                 dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
                 cache=None):
+        # [batch_size, tgt_len, d_model]
         q = self.pre_process_layer1(dec_input)
+        # [batch_size, tgt_len, d_model]
         self_attn_output = self.self_attn(q, q, q, self_attn_bias, cache=cache, type='self')
         self_attn_output = self.post_process_layer1(dec_input, self_attn_output)
 
         q = self.pre_process_layer2(self_attn_output)
+        # [batch_size, len_q, d_model]
         hier_attn_output = self.multi_head_hierarchical_attn(
             q, enc_sents_output, enc_sents_output, enc_words_output, enc_words_output,
             dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
@@ -112,9 +115,11 @@ class GraphDecoderLayer(nn.Module):
         hier_attn_output = self.post_process_layer2(self_attn_output, hier_attn_output)
 
         x = self.pre_process_layer3(hier_attn_output)
+        # [batch_size, len_q, d_model]
         ffd_output = self.pos_wise_ffd(x)
         dec_output = self.post_process_layer3(hier_attn_output, ffd_output)
 
+        # [batch_size, len_q, d_model]
         return dec_output
 
 
@@ -139,6 +144,7 @@ class GraphDecoder(nn.Module):
                 dec_self_attn_bias, dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
                 state=None):
         for i in range(self.n_layers):
+            # [batch_size, len_q, d_model]
             dec_output = self.graph_decoder_layers[i](
                 dec_input, enc_words_output, enc_sents_output,
                 dec_self_attn_bias, dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
@@ -148,6 +154,7 @@ class GraphDecoder(nn.Module):
 
         dec_output = self.pre_process_layer(dec_output)
 
+        # [batch_size, len_q, d_model]
         return dec_output
 
     def init_decoder_state(self, with_cache=False):

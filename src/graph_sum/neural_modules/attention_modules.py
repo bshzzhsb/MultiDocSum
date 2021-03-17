@@ -12,12 +12,11 @@ class ScaledDotProductAttention(nn.Module):
 
     def forward(self, q, k, v, bias=None):
         """
-        :param q: [batch_size, n_heads, len_q, d_k]
-        :param k: [batch_size, n_heads, len_k, d_k]
-        :param v: [batch_size, n_heads, len_v, d_v]
+        :param q: [batch_size, n_heads, len_q, dim_per_head]
+        :param k: [batch_size, n_heads, len_k, dim_per_head]
+        :param v: [batch_size, n_heads, len_v, dim_per_head]
         :param bias: [batch_size, n_heads, len_q, len_k]
-        len_q = len_k = len_v
-        d_model = n_heads * d_k = n_heads * d_v
+        :return:
         """
         # [batch_size, n_heads, len_q, len_k]
         attn = torch.matmul(q / (self.d_k ** 0.5), k.transpose(2, 3))
@@ -27,7 +26,7 @@ class ScaledDotProductAttention(nn.Module):
 
         # [batch_size, n_heads, len_q, len_k]
         weights = self.dropout(F.softmax(attn, dim=-1))
-        # [batch_size, n_heads, len_q, d_v]
+        # [batch_size, n_heads, len_q, dim_per_head]
         output = torch.matmul(weights, v)
         return output
 

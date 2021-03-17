@@ -144,69 +144,82 @@ class GraphSum(nn.Module):
         src_word, src_word_pos, src_sent_pos, src_words_self_attn_bias, \
             src_sent_self_attn_bias, graph_attn_bias = enc_input
 
-        # [batch_size, max_n_blocks, max_n_tokens, embed_dim]
+        # [batch_size, n_blocks, n_tokens, d_model]
         word_embed_out = self.encoder_word_embedding(src_word)
         word_embed_out = word_embed_out * (self.embed_size ** 0.5)
 
-        # [batch_size, max_n_blocks, max_n_tokens, embed_dim / 2]
+        # [batch_size, n_blocks, n_tokens, d_model / 2]
         word_pos_out = self.encoder_word_pos_embedding(src_word_pos)
 
-        # [batch_size, max_n_blocks, embed_dim / 2]
+        # [batch_size, n_blocks, embed_dim / 2]
         sent_pos_out = self.encoder_sent_pos_embedding(src_sent_pos)
 
-        # [batch_size, max_n_blocks, max_n_tokens, embed_dim / 2]
+        # [batch_size, n_blocks, n_tokens, d_model / 2]
         sent_pos_out = torch.unsqueeze(sent_pos_out, 2).expand(-1, -1, self.max_para_len, -1)
 
-        # [batch_size, n_blocks, n_tokens, embed_dim]
+        # [batch_size, n_blocks, n_tokens, d_model]
         combined_pos_enc = torch.cat((word_pos_out, sent_pos_out), dim=-1)
 
-        # [batch_size, n_blocks, n_tokens, embed_dim]
+        # [batch_size, n_blocks, n_tokens, d_model]
         embed_out = word_embed_out + combined_pos_enc
         embed_out = self.encoder_embedding_dropout(embed_out)
 
+        # [batch_size * n_blocks, n_tokens, d_model]
         embed_out = embed_out.contiguous().view(-1, self.max_para_len, self.embed_size)
 
+        # [batch_size * n_blocks, n_heads, n_tokens, n_tokens]
         src_words_self_attn_bias = src_words_self_attn_bias.contiguous().view(
             -1, self.n_heads, self.max_para_len, self.max_para_len
         )
 
+        # [batch_size * n_blocks, n_tokens, d_model]
         enc_words_out = self.transformer_encoder(embed_out, src_words_self_attn_bias)
 
+        # [batch_size, n_blocks, d_model]
         enc_sents_out = self.graph_encoder(
             enc_words_out, src_words_self_attn_bias, src_sent_self_attn_bias, graph_attn_bias
         )
 
         enc_words_out = self.post_encoder(enc_words_out)
 
+        # [batch_size, n_blocks, n_tokens, d_model]
         enc_words_out = enc_words_out.contiguous().view(
             -1, self.max_para_num, self.max_para_len, self.embed_size
         )
 
+        # [batch_size, n_blocks, n_tokens, d_model] [batch_size, n_blocks, d_model]
         return enc_words_out, enc_sents_out
 
     def decode(self, dec_input, enc_words_out, enc_sents_out, state=None):
         tgt_word, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias, \
             tgt_src_sents_attn_bias, graph_attn_bias = dec_input
 
+        # [batch_size, tgt_len, d_model]
         embed_out = self.decoder_embedding(tgt_word)
         embed_out = embed_out * (self.embed_size ** 0.5)
 
+        # [batch_size, tgt_len, d_model]
         pos_embed_out = self.decoder_pos_embedding(tgt_pos)
 
+        # [batch_size, tgt_len, d_model]
         embed_out = embed_out + pos_embed_out
         embed_out = self.decoder_embedding_dropout(embed_out)
 
+        # [batch_size, tgt_len, d_model]
         dec_output = self.graph_decoder(
             embed_out, enc_words_out, enc_sents_out, tgt_self_attn_bias,
             tgt_src_words_attn_bias, tgt_src_sents_attn_bias, graph_attn_bias,
             state=state
         )
 
+        # [batch_size * tgt_len, d_model]
         dec_output = dec_output.contiguous().view(-1, self.embed_size)
 
+        # [batch_size * tgt_len, vocab_size]
         predict = self.generator_fc(dec_output)
-
         predict = self.generator_log_softmax(predict)
+
+        # [batch_size * tgt_len, vocab_size]
         return predict
 
     def forward(self, enc_input, dec_input):
