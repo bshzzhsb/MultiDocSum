@@ -109,7 +109,7 @@ def train(spm):
         pickle.dump(vocab, file)
         file.close()
 
-    len_dataset = len(dataset)
+    len_dataset = dataset.shape[0]
     all_indices = list(range(len_dataset))
     np.random.shuffle(all_indices)
     batch_size, device, epochs = args.batch_size, args.device, args.epochs
