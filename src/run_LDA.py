@@ -105,7 +105,7 @@ def model_builder(checkpoint=None):
 def train(spm):
     dataset, vocab = gen_dataset(spm)
 
-    with open('../spm/vocab.pt', 'wb') as file:
+    with open(args.model_path + '/vocab.pt', 'wb') as file:
         pickle.dump(vocab, file)
         file.close()
 
