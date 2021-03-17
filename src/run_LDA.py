@@ -109,6 +109,7 @@ def train(spm):
         pickle.dump(vocab, file)
         file.close()
 
+    args.vocab_size = len(vocab)
     len_dataset = dataset.shape[0]
     all_indices = list(range(len_dataset))
     np.random.shuffle(all_indices)
@@ -181,7 +182,6 @@ def main():
 
     spm = sentencepiece.SentencePieceProcessor()
     spm.Load(args.vocab_path)
-    args.vocab_size = len(spm)
 
     args.device = 'cuda' if args.use_cuda else 'cpu'
 
