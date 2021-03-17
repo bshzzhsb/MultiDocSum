@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 from torch.nn.init import normal_
 
-from graph_sum.models.neural_modules.encoder import TransformerEncoder, GraphEncoder
-from graph_sum.models.neural_modules.decoder import GraphDecoder
-from graph_sum.models.neural_modules.neural_modules import PreProcessLayer, PositionalEncoding
+from graph_sum.neural_modules.encoder import TransformerEncoder, GraphEncoder
+from graph_sum.neural_modules.decoder import GraphDecoder
+from graph_sum.neural_modules.neural_modules import PreProcessLayer, PositionalEncoding
 
 
 class GraphSum(nn.Module):

@@ -5,7 +5,7 @@ import sentencepiece
 import os
 
 from modules.data_loader import DataLoader, load_dataset
-from graph_sum.models.model import GraphSum
+from graph_sum.model import GraphSum
 from modules.optimizer import build_optim
 from models.trainer_builder import build_trainer
 from models.predictor_builder import build_predictor

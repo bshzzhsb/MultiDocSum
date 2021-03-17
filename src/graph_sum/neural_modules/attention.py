@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from graph_sum.models.neural_modules.attention_modules import \
+from graph_sum.neural_modules.attention_modules import \
     ScaledDotProductAttention, DotProductPooling, \
     GraphScaledDotProductAttention, \
     GraphScaledDotProductAttentionWithMask, \
