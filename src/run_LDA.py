@@ -6,9 +6,11 @@ import glob
 import gc
 import sentencepiece
 import torch
+import pickle
 import numpy as np
 from datetime import datetime
 from tensorboardX import SummaryWriter
+from sklearn.feature_extraction.text import CountVectorizer
 
 from models.lda import ProdLDA
 from utils.logger import init_logger, logger
@@ -59,6 +61,32 @@ def data_loader(phase='*'):
         yield torch.tensor(batch, dtype=torch.float32)
 
 
+def gen_dataset(spm, phase='*'):
+    data_path = args.data_path
+
+    def _lazy_dataset_loader(pt_file):
+        print('loading file %s' % pt_file)
+        dataset = json.load(open(pt_file))
+        return dataset
+
+    pts = sorted(glob.glob(data_path + '/' + phase + '/*.[0-9]*.json'))
+    assert len(pts) > 0
+    np.random.shuffle(pts)
+
+    train_dataset = []
+    for pt in pts:
+        data = _lazy_dataset_loader(pt)
+        for item in data:
+            for src in item['src']:
+                train_dataset.append(spm.DecodeIds(src))
+
+    vectorizer = CountVectorizer(max_df=args.max_df, min_df=args.min_df)
+    train_dataset = vectorizer.fit_transform(train_dataset)
+    vocab = vectorizer.get_feature_names()
+
+    return train_dataset, vocab
+
+
 def optimizer_builder(model):
     if args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(
@@ -74,26 +102,35 @@ def model_builder(checkpoint=None):
     return model
 
 
-def train():
-    epoch_steps = math.ceil(get_num_example()[0] / args.batch_size)
-    args.train_steps = args.epochs * epoch_steps
-    logger.info('num steps: {}'.format(args.train_steps))
-
+def train(spm):
     model = model_builder()
     args.warmup_steps = None
     optimizer = build_optim(args, model, checkpoint=None)
     tensorboard_dir = args.log_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
     writer = SummaryWriter(tensorboard_dir)
 
+    dataset, vocab = gen_dataset(spm)
+
+    with open('../spm/vocab.pt', 'wb') as file:
+        pickle.dump(vocab, file)
+        file.close()
+    
+    len_dataset = len(dataset)
+    all_indices = list(range(len_dataset))
+    np.random.shuffle(all_indices)
+    batch_size, device, epochs = args.batch_size, args.device, args.epochs
+
+    epoch_steps = math.ceil(len_dataset / batch_size)
+    args.train_steps = args.epochs * epoch_steps
+    logger.info('num steps: {}'.format(args.train_steps))
+
     model.train()
-    data_iter = data_loader()
     step = 1
-    while step <= args.train_steps:
-        len_data = 0
+    for _ in range(epochs):
         loss_epoch = 0.0
-        for batch in data_iter:
-            batch = batch.to(args.device)
-            len_data += len(batch)
+        for i in range(0, len_dataset, batch_size):
+            batch_indices = all_indices[i: i+batch_size]
+            batch = torch.tensor(dataset[batch_indices].toarray(), dtype=torch.float32, device=device)
             model.zero_grad()
             recon, loss = model(batch)
             loss.backward()
@@ -104,9 +141,7 @@ def train():
                 writer.add_scalar('train/loss', loss, step)
                 logger.info('Step {}, loss {}, lr: {}'.format(step, loss, optimizer.learning_rate))
             step += 1
-        epoch_steps = args.train_steps / args.epochs
         logger.info('Epoch {}, average epoch loss {}'.format(step / epoch_steps, loss_epoch / epoch_steps))
-        data_iter = data_loader()
 
     checkpoint = {
         'model': model.state_dict(),
@@ -115,8 +150,7 @@ def train():
     }
     checkpoint_path = os.path.join(args.model_path, 'prodlda_model.pt')
     logger.info('Saving checkpoint %s' % checkpoint_path)
-    if not os.path.exists(checkpoint_path):
-        torch.save(checkpoint, checkpoint_path)
+    torch.save(checkpoint, checkpoint_path)
 
 
 def test(spm):
@@ -152,7 +186,7 @@ def main():
     args.device = 'cuda' if args.use_cuda else 'cpu'
 
     if args.mode == 'train':
-        train()
+        train(spm)
 
     elif args.mode == 'test':
         test(spm)
@@ -165,6 +199,9 @@ if __name__ == '__main__':
     parser.add_argument('--log_path', default='../log', type=str)
     parser.add_argument('--model_path', default='../models', type=str)
     parser.add_argument('--checkpoint', default=None, type=str)
+
+    parser.add_argument('--max_df', default=0.5, type=float)
+    parser.add_argument('--min_df', default=0.001, type=float)
 
     parser.add_argument('--mode', default='train', type=str)
     parser.add_argument('--report_every', default=100, type=str)
