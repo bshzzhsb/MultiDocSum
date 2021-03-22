@@ -12,7 +12,7 @@ from datetime import datetime
 from tensorboardX import SummaryWriter
 from sklearn.feature_extraction.text import CountVectorizer
 
-from models.lda import ProdLDA
+from preprocess.lda import ProdLDA, TopicModel
 from utils.logger import init_logger, logger
 from modules.optimizer import build_optim
 
@@ -61,10 +61,17 @@ def data_loader(phase='*'):
         yield torch.tensor(batch, dtype=torch.float32)
 
 
-def gen_dataset(spm, phase='*'):
+def load_stop_words():
+    with open(args.stop_words_file, 'r', encoding='utf-8') as file:
+        stop_words = [line.strip() for line in file.readlines()]
+        file.close()
+    return stop_words
+
+
+def gen_dataset(phase='*'):
     data_path = args.data_path
 
-    def _lazy_dataset_loader(pt_file):
+    def dataset_loader(pt_file):
         print('loading file %s' % pt_file)
         dataset = json.load(open(pt_file))
         return dataset
@@ -75,16 +82,19 @@ def gen_dataset(spm, phase='*'):
 
     train_dataset = []
     for pt in pts:
-        data = _lazy_dataset_loader(pt)
+        data = dataset_loader(pt)
         for item in data:
-            for src in item['src']:
-                train_dataset.append(spm.DecodeIds(src))
+            train_dataset.append(item['tgt_str'])
 
-    vectorizer = CountVectorizer(max_df=args.max_df, min_df=args.min_df)
-    train_dataset = vectorizer.fit_transform(train_dataset)
+    return train_dataset
+
+
+def build_count_vectorizer(dataset, stop_words):
+    vectorizer = CountVectorizer(max_df=args.max_df, min_df=args.min_df, stop_words=stop_words)
+    dataset = vectorizer.fit_transform(dataset)
     vocab = vectorizer.get_feature_names()
 
-    return train_dataset, vocab
+    return dataset, vocab
 
 
 def optimizer_builder(model):
@@ -97,13 +107,14 @@ def optimizer_builder(model):
 
 def model_builder(checkpoint=None):
     model = ProdLDA(args, checkpoint=checkpoint)
-    if args.use_cuda:
-        model = model.cuda()
     return model
 
 
-def train(spm):
-    dataset, vocab = gen_dataset(spm)
+def train():
+    stop_words = load_stop_words()
+    # stop_words = 'english'
+    dataset = gen_dataset()
+    dataset, vocab = build_count_vectorizer(dataset, stop_words)
 
     with open(args.model_path + '/vocab.pt', 'wb') as file:
         pickle.dump(vocab, file)
@@ -122,7 +133,7 @@ def train(spm):
     model = model_builder()
     args.warmup_steps = None
     optimizer = build_optim(args, model, checkpoint=None)
-    tensorboard_dir = args.log_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
+    tensorboard_dir = args.model_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
     writer = SummaryWriter(tensorboard_dir)
 
     model.train()
@@ -147,58 +158,83 @@ def train(spm):
     checkpoint = {
         'model': model.state_dict(),
         'opt': args,
-        'optim': optimizer.optimizer.state_dict()
+        'optim': optimizer.optimizer.state_dict(),
+        'num_topics': args.num_topics
     }
     checkpoint_path = os.path.join(args.model_path, 'prodlda_model.pt')
     logger.info('Saving checkpoint %s' % checkpoint_path)
     torch.save(checkpoint, checkpoint_path)
 
 
-def test(spm):
+def test():
     assert args.checkpoint is not None
 
     logger.info('Loading checkpoint from %s' % args.checkpoint)
     checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
 
+    with open(args.vocab_file, 'rb') as file:
+        vocab = pickle.load(file)
+        file.close()
+    args.vocab_size = len(vocab)
+
     model = model_builder(checkpoint)
     model.eval()
 
     emb = model.decoder.weight.detach().numpy().T
-    print_top_words(emb, spm)
+    print_top_words(emb, vocab)
 
 
-def print_top_words(beta, spm, n_top_words=10):
+def predict(spm):
+    assert args.checkpoint is not None
+
+    with open(args.vocab_file, 'rb') as file:
+        vocab = pickle.load(file)
+        args.vocab_size = len(vocab)
+        file.close()
+
+    topic_model = TopicModel(args, vocab, args.device, args.checkpoint)
+
+    with open(args.data_path + '/train/MultiNews.30.train.0.json') as file:
+        dataset = json.load(file)
+        for data in dataset:
+            src = [spm.DecodeIds(i) for i in data['src']]
+            topic_words = topic_model.get_topic(src)
+
+
+def print_top_words(beta, vocab, n_top_words=10):
     logger.info('----------The Topics----------')
     for i in range(len(beta)):
-        logger.info(spm.DecodeIds([int(idx) for idx in beta[i].argsort()[: -n_top_words - 1: -1]]))
+        logger.info('topic {}: {}'.format(i, [vocab[idx] for idx in beta[i].argsort()[: -n_top_words - 1: -1]]))
     logger.info('----------End of Topics----------')
 
 
 def main():
-    log_dir = os.path.join(args.log_path, args.mode + datetime.now().strftime('-%b-%d_%H-%M-%S.log'))
-    init_logger(log_dir)
+    init_logger(args.log_file)
     logger.info(args)
     torch.manual_seed(args.random_seed)
 
     spm = sentencepiece.SentencePieceProcessor()
-    spm.Load(args.vocab_path)
+    spm.Load(args.spm_file)
 
     args.device = 'cuda' if args.use_cuda else 'cpu'
 
     if args.mode == 'train':
-        train(spm)
-
+        train()
     elif args.mode == 'test':
-        test(spm)
+        test()
+    elif args.mode == 'predict':
+        predict(spm)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', default='../../data/MultiNews', type=str)
-    parser.add_argument('--vocab_path', default='../spm/spm9998_3.model', type=str)
-    parser.add_argument('--log_path', default='../log', type=str)
+    parser.add_argument('--log_file', default='../log/lda.log', type=str)
     parser.add_argument('--model_path', default='../models', type=str)
     parser.add_argument('--checkpoint', default=None, type=str)
+    parser.add_argument('--spm_file', default='../vocab/spm9998_3.model', type=str)
+    parser.add_argument('--vocab_file', default='../results/prod_lda/vocab.pt', type=str)
+    parser.add_argument('--stop_words_file', default='../files/stop_words.txt', type=str)
 
     parser.add_argument('--max_df', default=0.5, type=float)
     parser.add_argument('--min_df', default=0.001, type=float)
@@ -209,7 +245,7 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_size', default=256, type=int)
     parser.add_argument('--enc1_units', default=256, type=int)
     parser.add_argument('--enc2_units', default=256, type=int)
-    parser.add_argument('--num_topic', default=50, type=int)
+    parser.add_argument('--num_topics', default=50, type=int)
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--optimizer', default='Adam', type=str)
     parser.add_argument('--lr', default=2e-3, type=float)

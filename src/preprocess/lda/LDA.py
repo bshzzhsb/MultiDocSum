@@ -14,18 +14,18 @@ class ProdLDA(nn.Module):
         self.encoder1_fc = nn.Linear(args.vocab_size, args.enc1_units)
         self.encoder2_fc = nn.Linear(args.enc1_units, args.enc2_units)
         self.encoder2_drop = nn.Dropout(args.dropout)
-        self.mean_fc = nn.Linear(args.enc2_units, args.num_topic)
-        self.mean_bn = nn.BatchNorm1d(args.num_topic)
-        self.log_var_fc = nn.Linear(args.enc2_units, args.num_topic)
-        self.log_var_bn = nn.BatchNorm1d(args.num_topic)
+        self.mean_fc = nn.Linear(args.enc2_units, args.num_topics)
+        self.mean_bn = nn.BatchNorm1d(args.num_topics)
+        self.log_var_fc = nn.Linear(args.enc2_units, args.num_topics)
+        self.log_var_bn = nn.BatchNorm1d(args.num_topics)
         self.p_drop = nn.Dropout(args.dropout)
 
         # decoder
-        self.decoder = nn.Linear(args.num_topic, args.vocab_size)
+        self.decoder = nn.Linear(args.num_topics, args.vocab_size)
         self.decoder_bn = nn.BatchNorm1d(args.vocab_size)
 
-        prior_mean = torch.full([1, args.num_topic], 0, dtype=torch.float32, device=device)
-        prior_var = torch.full([1, args.num_topic], args.variance, dtype=torch.float32, device=device)
+        prior_mean = torch.full([1, args.num_topics], 0, dtype=torch.float32, device=device)
+        prior_var = torch.full([1, args.num_topics], args.variance, dtype=torch.float32, device=device)
         prior_log_var = prior_var.log()
         self.register_buffer('prior_mean', prior_mean)
         self.register_buffer('prior_var', prior_var)
@@ -40,9 +40,6 @@ class ProdLDA(nn.Module):
         self.to(device)
 
     def encode(self, enc_input):
-
-
-    def forward(self, enc_input):
         """
         :param enc_input: [batch_size, vocab_size]
         """
@@ -64,6 +61,14 @@ class ProdLDA(nn.Module):
         p = F.softmax(z, dim=-1)
         p = self.p_drop(p)
 
+        return p, posterior_mean, posterior_log_var, posterior_var
+
+    def forward(self, enc_input):
+        """
+        :param enc_input: [batch_size, vocab_size]
+        """
+        p, posterior_mean, posterior_log_var, posterior_var = self.encode(enc_input)
+
         # [batch_size, vocab_size]
         recon = F.softmax(self.decoder_bn(self.decoder(p)), dim=-1)
 
@@ -81,7 +86,7 @@ class ProdLDA(nn.Module):
         diff_term = diff * diff / prior_var
         log_var_division = prior_log_var - posterior_log_var
 
-        KLD = 0.5 * ((var_division + diff_term + log_var_division).sum(1) - self.args.num_topic)
+        KLD = 0.5 * ((var_division + diff_term + log_var_division).sum(1) - self.args.num_topics)
         loss = NL + KLD
 
         return loss.mean()
