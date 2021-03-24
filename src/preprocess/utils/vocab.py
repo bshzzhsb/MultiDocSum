@@ -1,8 +1,5 @@
-import argparse
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
-
-from data import load_stop_words, data_loader
 
 
 def build_count_vectorizer(dataset, stop_words):
@@ -29,21 +26,3 @@ def get_nearest_neighbors(word, embeddings, vocab):
     nearest_neighbors = most_similar[:20]
     nearest_neighbors = [vocab[comp] for comp in nearest_neighbors]
     return nearest_neighbors
-
-
-def main():
-    stop_words = load_stop_words(args.stop_words_file)
-    dataset = data_loader(args.data_path)
-
-    build_count_vectorizer(dataset, stop_words)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--max_df', default=0.7, type=float)
-    parser.add_argument('--min_df', default=100, type=int)
-    parser.add_argument('--stop_words_file', default='../../../files/stop_words.txt', type=str)
-
-    args = parser.parse_args()
-
-    main()
