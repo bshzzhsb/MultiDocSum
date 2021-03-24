@@ -21,8 +21,19 @@ args = parser.parse_args()
 # Class for a memory-friendly iterator over the dataset
 dataset = data_loader(args.data_path)
 
+
+class MySentences(object):
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    def __iter__(self):
+        for line in self.dataset:
+            yield line.split()
+
+
+sentences = MySentences(dataset)
 # Gensim code to obtain the embeddings
-model = gensim.models.Word2Vec(dataset, min_count=args.min_count, sg=args.sg, size=args.dim_rho,
+model = gensim.models.Word2Vec(sentences, min_count=args.min_count, sg=args.sg, size=args.dim_rho,
                                iter=args.iters, workers=args.workers, negative=args.negative_samples,
                                window=args.window_size)
 model.save('../models/w2v_300.model')
