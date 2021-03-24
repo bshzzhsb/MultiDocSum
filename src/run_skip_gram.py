@@ -26,9 +26,13 @@ dataset = data_loader(args.data_path)
 class MySentences(object):
     def __init__(self, dataset):
         self.dataset = dataset
+        self.epoch = 0
 
     def __iter__(self):
-        for line in tqdm(self.dataset):
+        self.epoch += 1
+        pbar = tqdm(self.dataset)
+        pbar.set_description('Epoch: {}'.format(self.epoch))
+        for line in pbar:
             yield line.split()
 
 
