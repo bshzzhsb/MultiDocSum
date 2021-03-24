@@ -1,5 +1,6 @@
 import gensim
 import argparse
+from tqdm import tqdm
 
 from preprocess.utils import data_loader
 
@@ -27,7 +28,7 @@ class MySentences(object):
         self.dataset = dataset
 
     def __iter__(self):
-        for line in self.dataset:
+        for line in tqdm(self.dataset):
             yield line.split()
 
 
