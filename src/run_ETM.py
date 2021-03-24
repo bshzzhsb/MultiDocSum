@@ -195,6 +195,9 @@ if __name__ == '__main__':
     parser.add_argument('--beta1', default=0.9, type=float)
     parser.add_argument('--beta2', default=0.998, type=float)
 
+    # visualization
+    parser.add_argument('--num_words', default=10, type=int)
+
     args = parser.parse_args()
 
     main()
