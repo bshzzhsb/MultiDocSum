@@ -2,8 +2,8 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
 
-def build_count_vectorizer(dataset, stop_words):
-    vectorizer = CountVectorizer(max_df=args.max_df, min_df=args.min_df, stop_words=stop_words)
+def build_count_vectorizer(dataset, stop_words, max_df, min_df):
+    vectorizer = CountVectorizer(max_df=max_df, min_df=min_df, stop_words=stop_words)
     dataset = vectorizer.fit_transform(dataset)
     vocab = dataset.get_feature_names()
 

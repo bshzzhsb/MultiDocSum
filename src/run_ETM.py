@@ -35,7 +35,7 @@ def train():
     stop_words = load_stop_words(args.stop_words_file)
     # stop_words = 'english'
     dataset = data_loader(args.data_path)
-    dataset, vocab = build_count_vectorizer(dataset, stop_words)
+    dataset, vocab = build_count_vectorizer(dataset, stop_words, args.max_df, args.min_df)
 
     logger.info('Saving vocab to {}'.format(args.model_path + '/vocab.pkl'))
     with open(args.model_path + '/vocab.pkl', 'wb') as file:
