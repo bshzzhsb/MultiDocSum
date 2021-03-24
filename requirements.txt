@@ -4,3 +4,4 @@ tensorboardX
 pyrouge
 tqdm
 scikit-learn
+gensim
