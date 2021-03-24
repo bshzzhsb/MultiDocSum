@@ -7,20 +7,11 @@ import pickle
 import numpy as np
 from datetime import datetime
 from tensorboardX import SummaryWriter
-from sklearn.feature_extraction.text import CountVectorizer
 
 from preprocess.lda import ETM
-from preprocess.utils.data import load_stop_words, data_loader
+from preprocess.utils import load_stop_words, data_loader, build_count_vectorizer, get_nearest_neighbors
 from utils.logger import init_logger, logger
 from modules.optimizer import build_optim
-
-
-def build_count_vectorizer(dataset, stop_words):
-    vectorizer = CountVectorizer(max_df=args.max_df, min_df=args.min_df, stop_words=stop_words)
-    dataset = vectorizer.fit_transform(dataset)
-    vocab = vectorizer.get_feature_names()
-
-    return dataset, vocab
 
 
 def optimizer_builder(model):
@@ -46,7 +37,8 @@ def train():
     dataset = data_loader(args.data_path)
     dataset, vocab = build_count_vectorizer(dataset, stop_words)
 
-    with open(args.model_path + '/vocab.pt', 'wb') as file:
+    logger.info('Saving vocab to {}'.format(args.model_path + '/vocab.pkl'))
+    with open(args.model_path + '/vocab.pkl', 'wb') as file:
         pickle.dump(vocab, file)
         file.close()
 
@@ -66,9 +58,9 @@ def train():
     tensorboard_dir = args.model_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
     writer = SummaryWriter(tensorboard_dir)
 
-    model.train()
     step = 1
     for _ in range(epochs):
+        model.train()
         acc_loss = 0.0
         acc_kl_theta_loss = 0.0
         for i in range(0, len_dataset, batch_size):
@@ -99,24 +91,51 @@ def train():
         avg_acc_loss, avg_acc_kl_theta_loss = acc_loss / epoch_steps, acc_kl_theta_loss / epoch_steps
         avg_NELBO = avg_acc_loss + avg_acc_kl_theta_loss
         logger.info('Epoch {}, avg loss: {}, avg kl_theta: {}, avg NELBO: {}'.format(
-            step / epoch_steps, avg_acc_loss, avg_acc_kl_theta_loss, avg_NELBO))
+            step // epoch_steps, avg_acc_loss, avg_acc_kl_theta_loss, avg_NELBO))
 
+    visualize(model, vocab)
     checkpoint = {
         'model': model.state_dict(),
         'opt': args,
         'optim': optimizer.optimizer.state_dict(),
         'num_topics': args.num_topics
     }
-    checkpoint_path = os.path.join(args.model_path, 'prodlda_model.pt')
+    checkpoint_path = os.path.join(args.model_path, 'etm.pt')
     logger.info('Saving checkpoint %s' % checkpoint_path)
     torch.save(checkpoint, checkpoint_path)
 
 
-def print_top_words(beta, vocab, n_top_words=100):
-    logger.info('----------The Topics----------')
-    for i in range(len(beta)):
-        logger.info('topic {}: {}'.format(i, [vocab[idx] for idx in beta[i].argsort()[: -n_top_words - 1: -1]]))
-    logger.info('----------End of Topics----------')
+def visualize(model, vocab, show_emb=True):
+    model.eval()
+    queries = ['andrew', 'computer', 'sports', 'religion', 'man', 'love',
+               'intelligence', 'money', 'politics', 'health', 'people', 'family']
+
+    # visualize topics using monte carlo
+    with torch.no_grad():
+        print('#' * 100)
+        print('Visualize topics...')
+        topics_words = []
+        gammas = model.get_beta()
+        for k in range(args.num_topics):
+            gamma = gammas[k]
+            top_words = list(gamma.cpu().numpy().argsort()[-args.num_words + 1:][::-1])
+            topic_words = [vocab[a] for a in top_words]
+            topics_words.append(' '.join(topic_words))
+            print('Topic {}: {}'.format(k, topic_words))
+
+        if show_emb:
+            # visualize word embeddings by using V to get nearest neighbors
+            print('#' * 100)
+            print('Visualize word embeddings by using output embedding matrix')
+            try:
+                embeddings = model.rho.weight  # Vocab_size x E
+            except:
+                embeddings = model.rho  # Vocab_size x E
+            neighbors = []
+            for word in queries:
+                print('word: {} .. neighbors: {}'.format(
+                    word, get_nearest_neighbors(word, embeddings, vocab)))
+            print('#' * 100)
 
 
 def main():
@@ -143,7 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--embed_file', default='../models/embedding.txt', type=str)
     parser.add_argument('--checkpoint', default=None, type=str)
     parser.add_argument('--spm_file', default='../vocab/spm9998_3.model', type=str)
-    parser.add_argument('--vocab_file', default='../results/prod_lda/vocab.pt', type=str)
+    parser.add_argument('--vocab_file', default='../results/etm/vocab.pt', type=str)
     parser.add_argument('--stop_words_file', default='../files/stop_words.txt', type=str)
 
     parser.add_argument('--mode', default='train', type=str)
