@@ -19,13 +19,15 @@ class TopicModel(object):
 
         logger.info('Loading checkpoint from %s' % checkpoint)
         checkpoint = torch.load(checkpoint, map_location=lambda storage, loc: storage)
+        args.num_topics = checkpoint['num_topics']
         self.model = ProdLDA(args, checkpoint=checkpoint)
-        self.model.eval()
 
     def get_topic(self, src):
-        src = self.vectorizer.transform(src).toarray()
-        src = torch.tensor(src, dtype=torch.float32, device=self.device)
-        probs, _, _, _ = self.model.encode(src)
+        self.model.eval()
+        with torch.no_grad():
+            src = self.vectorizer.transform(src).toarray()
+            src = torch.tensor(src, dtype=torch.float32, device=self.device)
+            probs, _, _, _ = self.model.encode(src)
 
-        topic_words = probs.numpy().argsort()[: -10 - 1: -1]
+            topic_words = probs.numpy().argsort()[: -10 - 1: -1]
         return topic_words
