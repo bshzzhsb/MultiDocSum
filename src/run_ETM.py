@@ -93,7 +93,7 @@ def train():
     writer = SummaryWriter(tensorboard_dir)
 
     step = 1
-    for i in range(epochs):
+    for epoch in range(epochs):
         model.train()
         acc_loss = 0.0
         acc_kl_theta_loss = 0.0
@@ -127,7 +127,7 @@ def train():
         logger.info('Epoch {}, avg loss: {}, avg kl_theta: {}, avg NELBO: {}'.format(
             step // epoch_steps, avg_acc_loss, avg_acc_kl_theta_loss, avg_NELBO))
 
-        if i % 50 == 0 and i > 0:
+        if epoch % 50 == 0 and epoch > 0:
             visualize(model, vocab)
 
     checkpoint = {
@@ -139,6 +139,24 @@ def train():
     checkpoint_path = os.path.join(args.model_path, 'etm.pt')
     logger.info('Saving checkpoint %s' % checkpoint_path)
     torch.save(checkpoint, checkpoint_path)
+
+
+def test():
+    assert args.checkpoint is not None
+
+    logger.info('Loading checkpoint from %s' % args.checkpoint)
+    checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
+    args.num_topics = checkpoint['num_topics']
+
+    with open(args.vocab_file, 'rb') as file:
+        vocab = pickle.load(file)
+    args.vocab_size = len(vocab)
+
+    embedding = load_embedding(args.embed_file, vocab)
+
+    model = model_builder(embedding, checkpoint)
+
+    visualize(model, vocab)
 
 
 def visualize(model, vocab, show_emb=True):
@@ -187,6 +205,8 @@ def main():
 
     if args.mode == 'train':
         train()
+    elif args.mode == 'test':
+        test()
 
 
 if __name__ == '__main__':
@@ -194,7 +214,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_path', default='../../data/MultiNews', type=str)
     parser.add_argument('--log_file', default='../log/run_etm.log', type=str)
     parser.add_argument('--model_path', default='../models', type=str)
-    parser.add_argument('--embed_file', default='../models/embeddings.txt', type=str)
+    parser.add_argument('--embed_file', default='../models/embedding.txt', type=str)
     parser.add_argument('--checkpoint', default=None, type=str)
     parser.add_argument('--spm_file', default='../vocab/spm9998_3.model', type=str)
     parser.add_argument('--vocab_file', default='../results/etm/vocab.pt', type=str)
