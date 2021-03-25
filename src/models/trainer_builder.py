@@ -48,7 +48,6 @@ class Trainer(object):
         logger.info('Start training...')
 
         step = self.optim._step + 1
-        normalization = 0
         train_iter = train_iter_fct()
 
         total_stats = Statistics()
@@ -59,12 +58,10 @@ class Trainer(object):
             for i, batch in enumerate(train_iter):
                 self.model.train()
                 num_tokens = batch.tgt_label.ne(self.train_loss.padding_idx).sum()
-                normalization += num_tokens.item()
+                normalization = num_tokens.item()
                 self._gradient_accumulation(batch, normalization, total_stats, report_stats)
 
                 report_stats = self._report_training(step, train_steps, self.optim.learning_rate, report_stats)
-
-                normalization = 0
 
                 if step % self.args.save_checkpoint_steps == 0:
                     self._save(step)

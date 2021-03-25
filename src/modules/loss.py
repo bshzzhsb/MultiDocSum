@@ -77,6 +77,8 @@ class NMTLossCompute(nn.Module):
         """
         :param target: [batch_size * max_tgt_len]
         :param output: [batch_size * max_tgt_len, vocab_size]
+        :param shard_size:
+        :param normalization:
         """
         batch_stats = Statistics()
         shard_state = {"output": output, "target": target}
