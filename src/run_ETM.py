@@ -14,6 +14,15 @@ from utils.logger import init_logger, logger
 from modules.optimizer import build_optim
 
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected')
+
+
 def optimizer_builder(model):
     if args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(
@@ -22,13 +31,36 @@ def optimizer_builder(model):
         return optimizer
 
 
-def model_builder(checkpoint=None):
+def model_builder(embedding=None, checkpoint=None):
     model = ETM(
         args.num_topics, args.vocab_size, args.hidden_size, args.rho_size, args.embed_size,
-        args.device, enc_drop=args.dropout, train_embedding=args.train_embedding,
-        checkpoint=checkpoint
+        args.device, embedding=embedding, enc_drop=args.dropout,
+        train_embedding=args.train_embedding, checkpoint=checkpoint
     )
     return model
+
+
+def load_embedding(embed_file, vocab):
+    vocab_size = len(vocab)
+    vectors = {}
+    with open(embed_file, 'r') as f:
+        for line in f:
+            line = line.split()
+            word = line[0]
+            if word in vocab:
+                vectors[word] = np.array(line[1:]).astype(np.float)
+    embeddings = np.zeros((vocab_size, args.embed_size))
+    words_found = 0
+    for i, word in enumerate(vocab):
+        try:
+            embeddings[i] = vectors[word]
+            words_found += 1
+        except KeyError:
+            embeddings[i] = np.random.normal(scale=0.6, size=(args.embed_size,))
+    embeddings = torch.from_numpy(embeddings).to(args.device)
+    logger.info('Found {} words / vocab size {}'.format(words_found, vocab_size))
+
+    return embeddings
 
 
 def train():
@@ -36,6 +68,8 @@ def train():
     # stop_words = 'english'
     dataset = data_loader(args.data_path)
     dataset, vocab = build_count_vectorizer(dataset, stop_words, args.max_df, args.min_df)
+
+    embedding = None if args.train_embedding else load_embedding(args.embed_file, vocab)
 
     logger.info('Saving vocab to {}'.format(args.model_path + '/vocab.pkl'))
     with open(args.model_path + '/vocab.pkl', 'wb') as file:
@@ -52,7 +86,7 @@ def train():
     args.train_steps = args.epochs * epoch_steps
     logger.info('num steps: {}'.format(args.train_steps))
 
-    model = model_builder()
+    model = model_builder(embedding=embedding)
     args.warmup_steps = None
     optimizer = build_optim(args, model, checkpoint=None)
     tensorboard_dir = args.model_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
@@ -112,8 +146,8 @@ def visualize(model, vocab, show_emb=True):
 
     # visualize topics using monte carlo
     with torch.no_grad():
-        print('#' * 100)
-        print('Visualize topics...')
+        logger.info('#' * 100)
+        logger.info('Visualize topics...')
         topics_words = []
         gammas = model.get_beta()
         for k in range(args.num_topics):
@@ -121,21 +155,20 @@ def visualize(model, vocab, show_emb=True):
             top_words = list(gamma.cpu().numpy().argsort()[-args.num_words + 1:][::-1])
             topic_words = [vocab[a] for a in top_words]
             topics_words.append(' '.join(topic_words))
-            print('Topic {}: {}'.format(k, topic_words))
+            logger.info('Topic {}: {}'.format(k, topic_words))
 
         if show_emb:
             # visualize word embeddings by using V to get nearest neighbors
-            print('#' * 100)
-            print('Visualize word embeddings by using output embedding matrix')
+            logger.info('#' * 100)
+            logger.info('Visualize word embeddings by using output embedding matrix')
             try:
                 embeddings = model.rho.weight  # Vocab_size x E
             except:
                 embeddings = model.rho  # Vocab_size x E
-            neighbors = []
             for word in queries:
-                print('word: {} .. neighbors: {}'.format(
+                logger.info('word: {} .. neighbors: {}'.format(
                     word, get_nearest_neighbors(word, embeddings, vocab)))
-            print('#' * 100)
+            logger.info('#' * 100)
 
 
 def main():
@@ -159,7 +192,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_path', default='../../data/MultiNews', type=str)
     parser.add_argument('--log_file', default='../log/run_etm.log', type=str)
     parser.add_argument('--model_path', default='../models', type=str)
-    parser.add_argument('--embed_file', default='../models/embedding.txt', type=str)
+    parser.add_argument('--embed_file', default='../models/embeddings.txt', type=str)
     parser.add_argument('--checkpoint', default=None, type=str)
     parser.add_argument('--spm_file', default='../vocab/spm9998_3.model', type=str)
     parser.add_argument('--vocab_file', default='../results/etm/vocab.pt', type=str)
@@ -175,13 +208,13 @@ if __name__ == '__main__':
     parser.add_argument('--rho_size', default=300, type=int)
     parser.add_argument('--embed_size', default=300, type=int)
     parser.add_argument('--hidden_size', default=800, type=int)
-    parser.add_argument('--train_embedding', default=True, type=bool)
+    parser.add_argument('--train_embedding', default=True, type=str2bool)
     parser.add_argument('--dropout', default=0.1, type=float)
     parser.add_argument('--max_grad_norm', default=2.0, type=float)
     parser.add_argument('--nonmono', default=10, type=int, help='number of bad hits allowed')
     parser.add_argument('--weight_decay', default=1.2e-6, type=float, help='some l2 regularization')
-    parser.add_argument('--anneal_lr', default=False, type=bool, help='whether to anneal the learning rate')
-    parser.add_argument('--bow_norm', default=True, type=bool, help='normalize the bows')
+    parser.add_argument('--anneal_lr', default=False, type=str2bool, help='whether to anneal the learning rate')
+    parser.add_argument('--bow_norm', default=True, type=str2bool, help='normalize the bows')
 
     parser.add_argument('--max_df', default=0.7, type=float)
     parser.add_argument('--min_df', default=100, type=int)

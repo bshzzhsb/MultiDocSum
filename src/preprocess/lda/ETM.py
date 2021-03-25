@@ -16,9 +16,8 @@ class ETM(nn.Module):
         if train_embedding:
             self.rho = nn.Linear(rho_size, vocab_size, bias=False)
         else:
-            num_embedding, embed_size = embedding.size()
-            self.rho = nn.Embedding(num_embedding, embed_size)
-            self.rho.weight = embedding.clone().float().to(device)
+            self.rho = nn.Embedding.from_pretrained(embedding.clone().float())
+            self.rho.weight.requires_grad = True
 
         self.alpha = nn.Linear(rho_size, n_topics, bias=False)
         self.q_theta_1 = nn.Linear(vocab_size, hidden_size)
