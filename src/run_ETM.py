@@ -93,7 +93,7 @@ def train():
     writer = SummaryWriter(tensorboard_dir)
 
     step = 1
-    for _ in range(epochs):
+    for i in range(epochs):
         model.train()
         acc_loss = 0.0
         acc_kl_theta_loss = 0.0
@@ -127,7 +127,9 @@ def train():
         logger.info('Epoch {}, avg loss: {}, avg kl_theta: {}, avg NELBO: {}'.format(
             step // epoch_steps, avg_acc_loss, avg_acc_kl_theta_loss, avg_NELBO))
 
-    visualize(model, vocab)
+        if i % 50 == 0 and i > 0:
+            visualize(model, vocab)
+
     checkpoint = {
         'model': model.state_dict(),
         'opt': args,
