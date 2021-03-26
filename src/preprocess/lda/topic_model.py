@@ -22,12 +22,17 @@ class TopicModel(object):
         args.num_topics = checkpoint['num_topics']
         self.model = ProdLDA(args, checkpoint=checkpoint)
 
-    def get_topic(self, src):
+    def get_topic(self, src, num_top_topic, num_top_word):
         self.model.eval()
         with torch.no_grad():
             src = self.vectorizer.transform(src).toarray()
             src = torch.tensor(src, dtype=torch.float32, device=self.device)
             probs, _, _, _ = self.model.encode(src)
+            vocab_probs = self.model.decode(probs)
 
-            topic_words = probs.numpy().argsort()[: -10 - 1: -1]
-        return topic_words
+            top_n_words = vocab_probs[0].numpy().argsort()[: -num_top_word - 1: -1]
+            top_n_words_probs = vocab_probs[0].numpy()[top_n_words]
+
+            top_n_topics = probs[0].numpy().argsort()[: -num_top_topic - 1: -1]
+            top_n_topics_probs = probs[0].numpy()[top_n_topics]
+        return top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs

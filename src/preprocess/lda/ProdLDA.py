@@ -63,14 +63,18 @@ class ProdLDA(nn.Module):
 
         return p, posterior_mean, posterior_log_var, posterior_var
 
+    def decode(self, p):
+        # [batch_size, vocab_size]
+        recon = F.softmax(self.decoder_bn(self.decoder(p)), dim=-1)
+        return recon
+
     def forward(self, enc_input):
         """
         :param enc_input: [batch_size, vocab_size]
         """
         p, posterior_mean, posterior_log_var, posterior_var = self.encode(enc_input)
 
-        # [batch_size, vocab_size]
-        recon = F.softmax(self.decoder_bn(self.decoder(p)), dim=-1)
+        recon = self.decode(p)
 
         return recon, self.loss(
             enc_input, recon, posterior_mean, posterior_log_var, posterior_var

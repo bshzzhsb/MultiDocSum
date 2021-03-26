@@ -17,6 +17,11 @@ from utils.logger import init_logger, logger
 from modules.optimizer import build_optim
 
 
+def int_float(v):
+    v = float(v)
+    return int(v) if v >= 1 else v
+
+
 def get_num_example():
     data_path = args.data_path
     pts = sorted(glob.glob(data_path + '/*/*.[0-9]*.json'))
@@ -171,6 +176,7 @@ def test():
 
     logger.info('Loading checkpoint from %s' % args.checkpoint)
     checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
+    args.num_topics = checkpoint['num_topics']
 
     with open(args.vocab_file, 'rb') as file:
         vocab = pickle.load(file)
@@ -181,10 +187,10 @@ def test():
     model.eval()
 
     emb = model.decoder.weight.detach().numpy().T
-    print_top_words(emb, vocab)
+    get_topic_words(emb, vocab)
 
 
-def predict(spm):
+def predict():
     assert args.checkpoint is not None
 
     with open(args.vocab_file, 'rb') as file:
@@ -193,19 +199,33 @@ def predict(spm):
         file.close()
 
     topic_model = TopicModel(args, vocab, args.device, args.checkpoint)
+    emb = topic_model.model.decoder.weight.detach().numpy().T
+    topic_words, topic_words_probs = get_topic_words(emb, vocab, 10)
 
-    with open(args.data_path + '/train/MultiNews.30.train.0.json') as file:
+    with open(args.data_path + '/train/MultiNews.30.train.11.json') as file:
         dataset = json.load(file)
-        for data in dataset:
-            src = [spm.DecodeIds(i) for i in data['src']]
-            topic_words = topic_model.get_topic(src)
+        with open('../results/prod_lda/n_topic_100/topics.txt', 'w', encoding='utf-8') as out:
+            for data in dataset:
+                tgt = [data['tgt_str']]
+                top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
+                    topic_model.get_topic(tgt, num_top_topic=5, num_top_word=10)
+                out.write(str([(vocab[word], prob) for (word, prob) in zip(top_n_words, top_n_words_probs)]) + '\n')
+                out.write(data['tgt_str'] + '\n')
 
 
-def print_top_words(beta, vocab, n_top_words=10):
+def get_topic_words(beta, vocab, n_top_words=10):
+    topic_words = []
+    topic_words_probs = []
     logger.info('----------The Topics----------')
     for i in range(len(beta)):
-        logger.info('topic {}: {}'.format(i, [vocab[idx] for idx in beta[i].argsort()[: -n_top_words - 1: -1]]))
+        top_words = [vocab[idx] for idx in beta[i].argsort()[: -n_top_words - 1: -1]]
+        top_words_probs = sorted(beta[i])[: -n_top_words - 1: -1]
+        topic_words.append(top_words)
+        topic_words_probs.append(top_words_probs)
+        logger.info('topic {}: {}'.format(i, [_ for _ in zip(top_words, top_words_probs)]))
     logger.info('----------End of Topics----------')
+
+    return topic_words, topic_words_probs
 
 
 def main():
@@ -223,7 +243,7 @@ def main():
     elif args.mode == 'test':
         test()
     elif args.mode == 'predict':
-        predict(spm)
+        predict()
 
 
 if __name__ == '__main__':
@@ -237,7 +257,7 @@ if __name__ == '__main__':
     parser.add_argument('--stop_words_file', default='../files/stop_words.txt', type=str)
 
     parser.add_argument('--max_df', default=0.5, type=float)
-    parser.add_argument('--min_df', default=0.001, type=float)
+    parser.add_argument('--min_df', default=100, type=int_float)
 
     parser.add_argument('--mode', default='train', type=str)
     parser.add_argument('--report_every', default=100, type=str)
@@ -257,7 +277,6 @@ if __name__ == '__main__':
     parser.add_argument('--init_mult', default=1.0, type=float)
     parser.add_argument('--variance', default=0.995, type=float)
     parser.add_argument('--dropout', default=0.1, type=float)
-    parser.add_argument('--start', action='store_true')
     parser.add_argument('--use_cuda', action='store_true')
     args = parser.parse_args()
 
