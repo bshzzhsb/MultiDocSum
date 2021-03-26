@@ -283,7 +283,7 @@ class GraphAttention(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
         self.fc = nn.Linear(in_features, out_features, bias=False)
-        self.a = nn.Linear(2 * out_features, 1, bias=False)
+        self.a = nn.Linear(2 * out_features // n_heads, 1, bias=False)
         self.leaky_relu = nn.LeakyReLU(alpha)
 
     def forward(self, h, mask):
@@ -308,14 +308,14 @@ class GraphAttention(nn.Module):
         # [batch_size, n_heads, n_blocks * n_blocks, dim_per_head * 2]
         attn_input = torch.cat([h_repeat_in_chunks, h_repeat_alternating], dim=-1)
         # [batch_size, n_heads, n_blocks, n_blocks, dim_per_head * 2]
-        attn_input = attn_input.view(-1, n_heads, n_blocks, n_blocks, 2 * self.out_features)
+        attn_input = attn_input.view(-1, n_heads, n_blocks, n_blocks, 2 * dim_per_head)
 
         # [batch_size, n_heads, n_blocks, n_blocks]
         e = self.leaky_relu(self.a(attn_input).squeeze(-1))
 
         # zero_vec = -9e15 * torch.ones_like(e)
         # attn = torch.where(adj > 0, e, zero_vec)
-        attn = e + mask
+        attn = e + mask[:, 0: n_heads]
 
         attn = F.softmax(attn, dim=-1)
         attn = self.dropout(attn)
