@@ -135,6 +135,9 @@ class GraphEncoder(nn.Module):
         self.self_attn_pooling_layer = SelfAttentionPoolingLayer(
             n_heads, d_model, d_v, n_blocks, dropout
         )
+        self.graph_attn_layers = nn.ModuleList(
+            [GATLayer(n_heads, d_model, dropout, 0.2) for _ in range(2)]
+        )
         self.graph_encoder_layers = nn.ModuleList(
             [GraphEncoderLayer(
                 n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win, dropout
@@ -152,6 +155,9 @@ class GraphEncoder(nn.Module):
         """
         # [batch_size, n_blocks, d_model]
         enc_input = self.self_attn_pooling_layer(enc_words_input, src_words_self_attn_bias)
+
+        for i in range(2):
+            enc_input = self.graph_attn_layers[i](enc_input, src_sents_self_attn_bias)
 
         for i in range(self.n_graph_layers):
             # [batch_size, n_blocks, d_model]

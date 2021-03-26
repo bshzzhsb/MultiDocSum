@@ -120,7 +120,7 @@ class MultiHeadPooling(nn.Module):
         out = self.attn(k, v, bias)
 
         # [batch_size, d_model]
-        out = out.transpose(1, 2).contiguous().view(batch_size, -1, n_heads * d_v).squeeze(1)
+        out = out.transpose(1, 2).contiguous().view(batch_size, n_heads * d_v)
         out = self.fc(out)
 
         # [batch_size, d_model]
