@@ -13,6 +13,7 @@ from tensorboardX import SummaryWriter
 from sklearn.feature_extraction.text import CountVectorizer
 
 from preprocess.lda import ProdLDA, TopicModel
+from preprocess.utils import data_loader, load_stop_words, build_count_vectorizer
 from utils.logger import init_logger, logger
 from modules.optimizer import build_optim
 
@@ -36,72 +37,6 @@ def get_num_example():
     return len_src, len_tgt
 
 
-def data_loader(phase='*'):
-    data_path = args.data_path
-
-    def _lazy_dataset_loader(pt_file):
-        print('loading file %s' % pt_file)
-        dataset = json.load(open(pt_file))
-        return dataset
-
-    def _to_onehot(dataset, min_len):
-        return np.bincount(dataset, minlength=min_len)
-
-    pts = sorted(glob.glob(data_path + '/' + phase + '/*.[0-9]*.json'))
-    assert len(pts) > 0
-    np.random.shuffle(pts)
-
-    batch = []
-    for pt in pts:
-        data = _lazy_dataset_loader(pt)
-        for item in data:
-            for src in item['src']:
-                batch.append(_to_onehot(src, args.vocab_size))
-                if len(batch) == args.batch_size:
-                    batch = np.array(batch)
-                    yield torch.tensor(batch, dtype=torch.float32)
-                    batch = []
-
-    if len(batch) > 0:
-        yield torch.tensor(batch, dtype=torch.float32)
-
-
-def load_stop_words():
-    with open(args.stop_words_file, 'r', encoding='utf-8') as file:
-        stop_words = [line.strip() for line in file.readlines()]
-        file.close()
-    return stop_words
-
-
-def gen_dataset(phase='*'):
-    data_path = args.data_path
-
-    def dataset_loader(pt_file):
-        print('loading file %s' % pt_file)
-        dataset = json.load(open(pt_file))
-        return dataset
-
-    pts = sorted(glob.glob(data_path + '/' + phase + '/*.[0-9]*.json'))
-    assert len(pts) > 0
-    np.random.shuffle(pts)
-
-    train_dataset = []
-    for pt in pts:
-        data = dataset_loader(pt)
-        for item in data:
-            train_dataset.append(item['tgt_str'])
-
-    return train_dataset
-
-
-def build_count_vectorizer(dataset, stop_words):
-    vectorizer = CountVectorizer(max_df=args.max_df, min_df=args.min_df, stop_words=stop_words)
-    dataset = vectorizer.fit_transform(dataset)
-    vocab = vectorizer.get_feature_names()
-
-    return dataset, vocab
-
-
 def optimizer_builder(model):
     if args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(
@@ -116,14 +51,13 @@ def model_builder(checkpoint=None):
 
 
 def train():
-    stop_words = load_stop_words()
+    stop_words = load_stop_words(args.stop_words_file)
     # stop_words = 'english'
-    dataset = gen_dataset()
-    dataset, vocab = build_count_vectorizer(dataset, stop_words)
+    dataset = data_loader(args.data_path)
+    dataset, vocab = build_count_vectorizer(dataset, stop_words, args.max_df, args.min_df)
 
-    with open(args.model_path + '/vocab.pt', 'wb') as file:
+    with open(args.model_path + '/vocab.pkl', 'wb') as file:
         pickle.dump(vocab, file)
-        file.close()
 
     args.vocab_size = len(vocab)
     len_dataset = dataset.shape[0]
@@ -142,7 +76,7 @@ def train():
     writer = SummaryWriter(tensorboard_dir)
 
     model.train()
-    step = 1
+    step = 0
     for _ in range(epochs):
         loss_epoch = 0.0
         for i in range(0, len_dataset, batch_size):
@@ -154,11 +88,11 @@ def train():
             optimizer.step()
             gc.collect()
             loss_epoch += loss.item()
-            if step % args.report_every == 0:
+            if step % args.report_every == 0 and step > 0:
                 writer.add_scalar('train/loss', loss, step)
                 logger.info('Step {}, loss {}, lr: {}'.format(step, loss, optimizer.learning_rate))
             step += 1
-        logger.info('Epoch {}, average epoch loss {}'.format(step / epoch_steps, loss_epoch / epoch_steps))
+        logger.info('Epoch {}, average epoch loss {}'.format(step // epoch_steps, loss_epoch / epoch_steps))
 
     checkpoint = {
         'model': model.state_dict(),

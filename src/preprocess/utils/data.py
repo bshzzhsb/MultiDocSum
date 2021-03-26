@@ -7,7 +7,6 @@ from sklearn.feature_extraction.text import CountVectorizer
 def load_stop_words(stop_words_file):
     with open(stop_words_file, 'r', encoding='utf-8') as file:
         stop_words = [line.strip() for line in file.readlines()]
-        file.close()
     return stop_words
 
 
