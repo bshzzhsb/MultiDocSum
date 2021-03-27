@@ -10,7 +10,7 @@ def load_stop_words(stop_words_file):
     return stop_words
 
 
-def data_loader(data_path, phase='*'):
+def data_loader(data_path, phase='*', source='tgt', spm=None):
 
     def dataset_loader(pt_file):
         print('loading file %s' % pt_file)
@@ -22,10 +22,19 @@ def data_loader(data_path, phase='*'):
     np.random.shuffle(pts)
 
     train_dataset = []
-    for pt in pts:
-        data = dataset_loader(pt)
-        for item in data:
-            train_dataset.append(item['tgt_str'])
+    if source == 'tgt':
+        for pt in pts:
+            data = dataset_loader(pt)
+            for item in data:
+                train_dataset.append(item['tgt_str'])
+    elif source == 'src':
+        for pt in pts:
+            data = dataset_loader(pt)
+            for item in data:
+                for src in item['src']:
+                    train_dataset.append(spm.DecodeIds(src))
+    else:
+        raise NotImplementedError('source must in ["tgt", "src"]')
 
     return train_dataset
 

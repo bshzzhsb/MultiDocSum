@@ -10,7 +10,6 @@ import pickle
 import numpy as np
 from datetime import datetime
 from tensorboardX import SummaryWriter
-from sklearn.feature_extraction.text import CountVectorizer
 
 from preprocess.lda import ProdLDA, TopicModel
 from preprocess.utils import data_loader, load_stop_words, build_count_vectorizer
@@ -46,17 +45,22 @@ def optimizer_builder(model):
 
 
 def model_builder(checkpoint=None):
-    model = ProdLDA(args, checkpoint=checkpoint)
+    model = ProdLDA(args.num_topics, args.enc1_units, args.enc2_units, args.vocab_size, args.variance,
+                    args.dropout, args.device, args.init_mult, checkpoint=checkpoint)
     return model
 
 
-def train():
+def train(spm):
+    vocab_save_file = args.model_path + '/vocab.pkl'
+    model_save_file = args.model_path + 'prod_lda_model.pt'
+
     stop_words = load_stop_words(args.stop_words_file)
     # stop_words = 'english'
-    dataset = data_loader(args.data_path)
+    dataset = data_loader(args.data_path, source=args.source, spm=spm)
     dataset, vocab = build_count_vectorizer(dataset, stop_words, args.max_df, args.min_df)
 
-    with open(args.model_path + '/vocab.pkl', 'wb') as file:
+    logger.info('Saving vocab to {}'.format(vocab_save_file))
+    with open(vocab_save_file, 'wb') as file:
         pickle.dump(vocab, file)
 
     args.vocab_size = len(vocab)
@@ -100,7 +104,7 @@ def train():
         'optim': optimizer.optimizer.state_dict(),
         'num_topics': args.num_topics
     }
-    checkpoint_path = os.path.join(args.model_path, 'prodlda_model.pt')
+    checkpoint_path = os.path.join(model_save_file)
     logger.info('Saving checkpoint %s' % checkpoint_path)
     torch.save(checkpoint, checkpoint_path)
 
@@ -124,7 +128,7 @@ def test():
     get_topic_words(emb, vocab)
 
 
-def predict():
+def predict(spm):
     assert args.checkpoint is not None
 
     with open(args.vocab_file, 'rb') as file:
@@ -140,11 +144,12 @@ def predict():
         dataset = json.load(file)
         with open('../results/prod_lda/n_topic_100/topics.txt', 'w', encoding='utf-8') as out:
             for data in dataset:
-                tgt = [data['tgt_str']]
-                top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
-                    topic_model.get_topic(tgt, num_top_topic=5, num_top_word=10)
-                out.write(str([(vocab[word], prob) for (word, prob) in zip(top_n_words, top_n_words_probs)]) + '\n')
-                out.write(data['tgt_str'] + '\n')
+                srcs = [[spm.DecodeIds(src)] for src in data['src']]
+                for src in srcs:
+                    top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
+                        topic_model.get_topic(src, num_top_topic=5, num_top_word=10)
+                    out.write(str([(vocab[word], prob) for (word, prob) in zip(top_n_words, top_n_words_probs)]) + '\n')
+                    out.write(src[0] + '\n')
 
 
 def get_topic_words(beta, vocab, n_top_words=10):
@@ -173,11 +178,11 @@ def main():
     args.device = 'cuda' if args.use_cuda else 'cpu'
 
     if args.mode == 'train':
-        train()
+        train(spm)
     elif args.mode == 'test':
         test()
     elif args.mode == 'predict':
-        predict()
+        predict(spm)
 
 
 if __name__ == '__main__':
@@ -194,6 +199,7 @@ if __name__ == '__main__':
     parser.add_argument('--min_df', default=100, type=int_float)
 
     parser.add_argument('--mode', default='train', type=str)
+    parser.add_argument('--source', default='tgt', type=str)
     parser.add_argument('--report_every', default=100, type=str)
     parser.add_argument('--random_seed', default=0, type=int)
     parser.add_argument('--hidden_size', default=256, type=int)
