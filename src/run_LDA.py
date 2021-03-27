@@ -59,7 +59,7 @@ def train(spm):
     dataset = data_loader(args.data_path, source=args.source, spm=spm)
     dataset, vocab = build_count_vectorizer(dataset, stop_words, args.max_df, args.min_df)
 
-    logger.info('Saving vocab to {}'.format(vocab_save_file))
+    logger.info('Saving vocab to {}, vocab size {}'.format(vocab_save_file, len(vocab)))
     with open(vocab_save_file, 'wb') as file:
         pickle.dump(vocab, file)
 
