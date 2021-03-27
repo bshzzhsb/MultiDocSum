@@ -61,9 +61,9 @@ class TransformerEncoder(nn.Module):
 
 class SelfAttentionPoolingLayer(nn.Module):
 
-    def __init__(self, n_heads, d_model, d_v, n_blocks, dropout):
+    def __init__(self, n_heads, d_model, d_v, batch_size, dropout):
         super(SelfAttentionPoolingLayer, self).__init__()
-        self.n_blocks = n_blocks
+        self.batch_size = batch_size
         self.d_model = d_model
 
         self.multi_head_pooling = MultiHeadPooling(n_heads, d_model, d_v, dropout)
@@ -82,7 +82,7 @@ class SelfAttentionPoolingLayer(nn.Module):
         # [batch_size * n_blocks, d_model]
         attn_output = self.multi_head_pooling(key, key, bias)
         # [batch_size, n_blocks, d_model]
-        attn_output = attn_output.contiguous().view(-1, self.n_blocks, self.d_model)
+        attn_output = attn_output.contiguous().view(self.batch_size, -1, self.d_model)
 
         pooling_output = self.dropout(attn_output)
 
@@ -125,7 +125,7 @@ class GraphEncoderLayer(nn.Module):
 
 class GraphEncoder(nn.Module):
 
-    def __init__(self, n_graph_layers, n_heads, n_blocks,
+    def __init__(self, n_graph_layers, n_heads, batch_size,
                  d_model, d_k, d_v, d_inner_hidden, pos_win, dropout):
         super(GraphEncoder, self).__init__()
         self.n_graph_layers = n_graph_layers
@@ -133,7 +133,7 @@ class GraphEncoder(nn.Module):
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
 
         self.self_attn_pooling_layer = SelfAttentionPoolingLayer(
-            n_heads, d_model, d_v, n_blocks, dropout
+            n_heads, d_model, d_v, batch_size, dropout
         )
         self.graph_encoder_layers = nn.ModuleList(
             [GraphEncoderLayer(
@@ -145,7 +145,7 @@ class GraphEncoder(nn.Module):
                 src_sents_self_attn_bias, graph_attn_bias):
         """
         :param enc_words_input: [batch_size * n_blocks, n_tokens, d_model]
-        :param src_words_self_attn_bias: [batch_size * n_blocks, n_heads, n_tokens, d_model]
+        :param src_words_self_attn_bias: [batch_size * n_blocks, n_heads, n_tokens, n_tokens]
         :param src_sents_self_attn_bias: [batch_size, n_heads, n_blocks, n_blocks]
         :param graph_attn_bias:
         :return: [batch_size, n_blocks, d_model]

@@ -1,7 +1,8 @@
 import torch.nn as nn
 
-from models.neural_modules.attention import MultiHeadAttention, MultiHeadHierarchicalAttention
+from models.neural_modules.attention import MultiHeadAttention, MultiHeadHierarchicalAttention, MultiHeadTopicAttention
 from models.neural_modules.neural_modules import PositionwiseFeedForward
+from models.layers.encoder import SelfAttentionPoolingLayer
 
 
 class TransformerDecoderLayer(nn.Module):
@@ -60,15 +61,17 @@ class TransformerDecoder(nn.Module):
 
 class GraphDecoderLayer(nn.Module):
 
-    def __init__(self, n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win, dropout, device):
+    def __init__(self, n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win, dropout, device, topic=None):
         super(GraphDecoderLayer, self).__init__()
+        self.topic = topic
+
         self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
         self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
         self.dropout = nn.Dropout(dropout)
 
         self.self_attn = MultiHeadAttention(n_heads, d_model, d_k, d_v, dropout)
         self.multi_head_hierarchical_attn = MultiHeadHierarchicalAttention(
-            pos_win, d_k, d_v, d_model, device, n_heads, dropout
+            pos_win, d_k, d_v, d_model, device, n_heads, dropout, topic=topic
         )
 
         self.pos_ffd = PositionwiseFeedForward(d_model, d_inner_hidden, dropout)
@@ -100,9 +103,15 @@ class GraphDecoderLayer(nn.Module):
 
 class GraphDecoder(nn.Module):
 
-    def __init__(self, n_layers, n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win, dropout, device):
+    def __init__(self, batch_size, n_layers, n_heads, d_model, d_k, d_v,
+                 d_inner_hidden, pos_win, dropout, device, topic=None):
         super(GraphDecoder, self).__init__()
         self.n_layers = n_layers
+        self.topic = topic
+
+        if self.topic == 'sum':
+            self.pooling = SelfAttentionPoolingLayer(n_heads, d_model, d_v, batch_size, dropout)
+            self.topic_attn = MultiHeadTopicAttention(n_heads, d_model, dropout)
 
         self.graph_decoder_layers = nn.ModuleList([
             GraphDecoderLayer(
@@ -114,7 +123,13 @@ class GraphDecoder(nn.Module):
 
     def forward(self, dec_input, enc_words_output, enc_sents_output, dec_self_attn_bias,
                 dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
-                state=None):
+                topic=None, topic_bias=None, state=None):
+        if self.topic == 'sum':
+            # [batch_size * tgt_len, n_topic_words, d_model]
+            dec_input = self.topic_attn(topic, dec_input, dec_input, topic_bias)
+            # [batch_size, tgt_len, d_model]
+            dec_input = self.pooling(dec_input)
+
         for i in range(self.n_layers):
             # [batch_size, len_q, d_model]
             dec_output = self.graph_decoder_layers[i](

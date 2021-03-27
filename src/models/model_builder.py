@@ -8,13 +8,16 @@ from models.neural_modules.neural_modules import PositionalEncoding
 
 
 def init_params(initializer_std, model: nn.Module):
-    for m in model.modules():
-        if isinstance(m, nn.Linear):
-            xavier_uniform_(m.weight)
-            if m.bias is not None:
-                constant_(m.bias, 0.0)
-        elif isinstance(m, nn.Embedding):
-            normal_(m.weight, mean=0, std=initializer_std)
+    # for m in model.modules():
+    #     if isinstance(m, nn.Linear):
+    #         xavier_uniform_(m.weight)
+    #         if m.bias is not None:
+    #             constant_(m.bias, 0.0)
+    #     elif isinstance(m, nn.Embedding):
+    #         normal_(m.weight, mean=0, std=initializer_std)
+    for p in model.parameters():
+        if p.dim() > 1:
+            normal_(p, mean=0, std=initializer_std)
 
 
 class MultiDocSum(nn.Module):
@@ -24,6 +27,7 @@ class MultiDocSum(nn.Module):
         self.args = args
         self.tokenizer = tokenizer
         self.vocab_size = len(tokenizer)
+        self.batch_size = args.batch_size
         self.max_para_num = args.max_para_num
         self.max_para_len = args.max_para_len
         self.max_tgt_len = args.max_tgt_len
@@ -71,7 +75,7 @@ class MultiDocSum(nn.Module):
         self.graph_encoder = GraphEncoder(
             n_graph_layers=self.enc_graph_layers,
             n_heads=self.n_heads,
-            n_blocks=self.max_para_num,
+            batch_size=self.batch_size,
             d_model=self.embed_size,
             d_k=self.embed_size // self.n_heads,
             d_v=self.embed_size // self.n_heads,
@@ -82,6 +86,7 @@ class MultiDocSum(nn.Module):
         self.enc_layer_norm = nn.LayerNorm(self.d_model, eps=1e-6)
 
         self.graph_decoder = GraphDecoder(
+            batch_size=args.batch_size,
             n_layers=self.dec_graph_layers,
             n_heads=self.n_heads,
             d_model=self.embed_size,

@@ -6,7 +6,8 @@ from models.neural_modules.attention_modules import \
     ScaledDotProductAttention, DotProductPooling, \
     GraphScaledDotProductAttention, \
     GraphScaledDotProductAttentionWithMask, \
-    ScaledDotProductAttentionWithSentenceNorm
+    ScaledDotProductAttentionWithSentenceNorm, \
+    TopicScaledDotProductAttention
 
 
 class MultiHeadAttention(nn.Module):
@@ -181,13 +182,14 @@ class MultiHeadStructureAttention(nn.Module):
 
 class MultiHeadHierarchicalAttention(nn.Module):
 
-    def __init__(self, pos_win, d_k, d_v, d_model, device, n_heads=1, dropout=0):
+    def __init__(self, pos_win, d_k, d_v, d_model, device, n_heads=1, dropout=0, topic=None):
         super(MultiHeadHierarchicalAttention, self).__init__()
         self.d_k = d_k
         self.d_v = d_v
         self.d_model = d_model
         self.n_heads = n_heads
         self.device = device
+        self.topic = topic
 
         self.w_qs_s = nn.Linear(d_model, n_heads * d_k)
         self.w_ks_s = nn.Linear(d_model, n_heads * d_k)
@@ -201,8 +203,14 @@ class MultiHeadHierarchicalAttention(nn.Module):
         self.attn_with_sent_norm = ScaledDotProductAttentionWithSentenceNorm(
             dropout, d_model, d_k, d_v, n_heads
         )
+        if self.topic == 'doc':
+            self.w_qs_t = nn.Linear(d_model, n_heads * d_k)
+            self.w_ks_t = nn.Linear(d_model, n_heads * d_k)
+            self.w_vs_t = nn.Linear(d_model, n_heads * d_v)
+            self.topic_attn = ScaledDotProductAttentionWithSentenceNorm(dropout, d_model, d_k, d_v, n_heads)
+            self.linear_topic = nn.Linear(3 * d_model, d_model)
 
-    def forward(self, q, k_s, v_s, k_w, v_w, bias_w, bias_s, graph_attn_bias, cache=None):
+    def forward(self, q, k_s, v_s, k_w, v_w, bias_w, bias_s, graph_attn_bias, topic_vec=None, cache=None):
         """
         :param q: [batch_size, seq_len, d_model]
         :param k_s: [batch_size, n_blocks, d_model]
@@ -212,6 +220,7 @@ class MultiHeadHierarchicalAttention(nn.Module):
         :param bias_w: [batch_size, n_blocks, n_heads, seq_len, n_tokens]
         :param bias_s: [batch_size, n_heads, seq_len, n_blocks]
         :param graph_attn_bias: [batch_size, n_heads, n_blocks, n_blocks]
+        :param topic_vec: []
         :param cache:
         :return: [batch_size, len_q, d_model]
         d_model = dim_embed = n_heads * d_k = n_heads * d_v
@@ -219,14 +228,14 @@ class MultiHeadHierarchicalAttention(nn.Module):
         """
         dim_per_head, n_heads = self.d_k, self.n_heads
         batch_size, len_q = q.size(0), q.size(1)
-        len_k_s, len_v_s, len_k_w, len_v_w, n_tokens = \
-            k_s.size(1), v_s.size(1), k_w.size(1), v_w.size(1), k_w.size(2)
+        len_k_s, len_v_s, len_k_w, len_v_w = \
+            k_s.size(1), v_s.size(1), k_w.size(1), v_w.size(1)
 
         def shape(x):
             return x.view(batch_size, -1, n_heads, dim_per_head).transpose(1, 2)
 
         def shape_w(x):
-            return x.view(batch_size, -1, n_tokens, n_heads, dim_per_head).transpose(2, 3)
+            return x.view(batch_size, len_k_w, -1, n_heads, dim_per_head).transpose(2, 3)
 
         q_s = self.w_qs_s(q)
         q_s = shape(q_s)
@@ -265,13 +274,56 @@ class MultiHeadHierarchicalAttention(nn.Module):
         # [batch_size, len_q, d_model]
         context_w, _ = self.attn_with_sent_norm(q_w, k_w, v_w, attns, bias_w)
 
+        if self.topic == 'doc':
+            q_t = self.w_qs_t(q)
+            q_t = shape(q_t)
+            k_t, v_t = self.w_ks_t(topic_vec), self.w_vs_t(topic_vec)
+            k_t, v_t = shape_w(k_t), shape_w(v_t)
+            context_t, _ = self.topic_attn(q_t, k_t, v_t, attns)
+            p = F.sigmoid(self.linear_topic(torch.cat([q, context_w, context_t], dim=-1)))
+            context_w = (1 - p) * context_w + p * context_t
+
         # [batch_size, len_q, d_model * 2]
-        out = torch.cat((context_s, context_w), dim=2)
+        out = torch.cat([context_s, context_w], dim=2)
         # [batch_size, len_q, d_model]
         out = self.fc(out)
 
         # [batch_size, len_q, d_model]
         return out
+
+
+class MultiHeadTopicAttention(nn.Module):
+
+    def __init__(self, n_heads, d_model, dropout=0):
+        super(MultiHeadTopicAttention, self).__init__()
+        self.d_model = d_model,
+        self.n_heads = n_heads
+        self.dim_per_head = d_model // n_heads
+        self.w_qs = nn.Linear(d_model, n_heads * self.dim_per_head)
+        self.w_ks = nn.Linear(d_model, n_heads * self.dim_per_head)
+        self.w_vs = nn.Linear(d_model, n_heads * self.dim_per_head)
+        self.topic_attn = TopicScaledDotProductAttention(d_model, self.dim_per_head, dropout)
+
+    def forward(self, q, k, v, bias):
+        """
+        :param q: [batch_size, n_topic_words, d_model]
+        :param k: [batch_size, tgt_len, d_model]
+        :param v: [batch_size, tgt_len, d_model]
+        :param bias: [batch_size, tgt_len, n_heads, n_topic_words, tgt_len]
+        """
+        batch_size, len_k, n_topic_words = k.size(0), k.size(1), q.size(1)
+        n_heads, dim_per_head = self.n_heads, self.dim_per_head
+
+        def shape(x):
+            return x.view(batch_size, -1, n_heads, dim_per_head).transpose(1, 2)
+
+        q, k, v = self.w_qs(q), self.w_ks(k), self.w_vs(v)
+        q, k, v = shape(q), shape(k), shape(v)
+
+        # [batch_size, n_topic_words * tgt_len, d_model]
+        attn = self.topic_attn(q, k, v, bias)
+        # [batch_size * tgt_len, n_topic_words, d_model]
+        attn = attn.view(batch_size * len_k, -1, self.d_model)
 
 
 class GraphAttention(nn.Module):
