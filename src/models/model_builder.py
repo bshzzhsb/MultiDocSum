@@ -107,6 +107,10 @@ class MultiDocSum(nn.Module):
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint['model'], strict=True)
+        else:
+            for p in self.parameters():
+                if p.dim() > 1:
+                    normal_(p, mean=0, std=self.initializer_std)
 
         self.to(device)
 

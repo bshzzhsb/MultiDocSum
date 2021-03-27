@@ -70,8 +70,8 @@ def train(device):
     else:
         raise NotImplementedError()
 
-    init = partial(init_params, args.initializer_range)
-    model.apply(init)
+    # init = partial(init_params, args.initializer_range)
+    # model.apply(init)
 
     optim = build_optim(args, model, checkpoint)
 
