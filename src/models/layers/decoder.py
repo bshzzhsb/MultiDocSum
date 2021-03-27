@@ -103,14 +103,14 @@ class GraphDecoderLayer(nn.Module):
 
 class GraphDecoder(nn.Module):
 
-    def __init__(self, batch_size, n_layers, n_heads, d_model, d_k, d_v,
-                 d_inner_hidden, pos_win, dropout, device, topic=None):
+    def __init__(self, n_layers, n_heads, d_model, d_k, d_v, d_inner_hidden,
+                 tgt_len, pos_win, dropout, device, topic=None):
         super(GraphDecoder, self).__init__()
         self.n_layers = n_layers
         self.topic = topic
 
         if self.topic == 'sum':
-            self.pooling = SelfAttentionPoolingLayer(n_heads, d_model, d_v, batch_size, dropout)
+            self.pooling = SelfAttentionPoolingLayer(n_heads, d_model, d_v, tgt_len, dropout)
             self.topic_attn = MultiHeadTopicAttention(n_heads, d_model, dropout)
 
         self.graph_decoder_layers = nn.ModuleList([

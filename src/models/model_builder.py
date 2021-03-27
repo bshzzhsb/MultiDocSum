@@ -75,7 +75,7 @@ class MultiDocSum(nn.Module):
         self.graph_encoder = GraphEncoder(
             n_graph_layers=self.enc_graph_layers,
             n_heads=self.n_heads,
-            batch_size=self.batch_size,
+            n_blocks=self.max_para_num,
             d_model=self.embed_size,
             d_k=self.embed_size // self.n_heads,
             d_v=self.embed_size // self.n_heads,
@@ -86,7 +86,7 @@ class MultiDocSum(nn.Module):
         self.enc_layer_norm = nn.LayerNorm(self.d_model, eps=1e-6)
 
         self.graph_decoder = GraphDecoder(
-            batch_size=args.batch_size,
+            tgt_len=args.max_tgt_len,
             n_layers=self.dec_graph_layers,
             n_heads=self.n_heads,
             d_model=self.embed_size,
