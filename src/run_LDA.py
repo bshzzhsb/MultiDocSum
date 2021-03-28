@@ -170,7 +170,7 @@ def preprocess(spm):
                 print('loading file %s' % pt)
                 data = json.load(pt_file)
                 pt_name = pt_file.name.split('/')[-1]
-            with open('../results/data/' + phase + '/' + pt_name, 'w', encoding='utf-8') as out_file:
+            with open(args.out_path + '/' + phase + '/' + pt_name, 'w', encoding='utf-8') as out_file:
                 for i, item in enumerate(data):
                     tgt = [item['tgt_str']]
                     top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
@@ -226,6 +226,7 @@ if __name__ == '__main__':
     parser.add_argument('--spm_file', default='../vocab/spm9998_3.model', type=str)
     parser.add_argument('--vocab_file', default='../results/prod_lda/vocab.pt', type=str)
     parser.add_argument('--stop_words_file', default='../files/stop_words.txt', type=str)
+    parser.add_argument('--out_path', default='../../data/MultiNewsTopic', type=str)
 
     parser.add_argument('--max_df', default=0.5, type=float)
     parser.add_argument('--min_df', default=100, type=int_float)
