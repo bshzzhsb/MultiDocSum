@@ -8,16 +8,13 @@ from models.neural_modules.neural_modules import PositionalEncoding
 
 
 def init_params(initializer_std, model: nn.Module):
-    # for m in model.modules():
-    #     if isinstance(m, nn.Linear):
-    #         xavier_uniform_(m.weight)
-    #         if m.bias is not None:
-    #             constant_(m.bias, 0.0)
-    #     elif isinstance(m, nn.Embedding):
-    #         normal_(m.weight, mean=0, std=initializer_std)
-    for p in model.parameters():
-        if p.dim() > 1:
-            normal_(p, mean=0, std=initializer_std)
+    for m in model.modules():
+        if isinstance(m, nn.Linear):
+            xavier_uniform_(m.weight)
+            if m.bias is not None:
+                constant_(m.bias, 0.0)
+        elif isinstance(m, nn.Embedding):
+            normal_(m.weight, mean=0, std=initializer_std)
 
 
 class MultiDocSum(nn.Module):
@@ -86,7 +83,7 @@ class MultiDocSum(nn.Module):
         self.enc_layer_norm = nn.LayerNorm(self.d_model, eps=1e-6)
 
         self.graph_decoder = GraphDecoder(
-            tgt_len=args.max_tgt_len,
+            tgt_len=self.max_tgt_len,
             n_layers=self.dec_graph_layers,
             n_heads=self.n_heads,
             d_model=self.embed_size,
@@ -107,10 +104,10 @@ class MultiDocSum(nn.Module):
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint['model'], strict=True)
-        else:
-            for p in self.parameters():
-                if p.dim() > 1:
-                    normal_(p, mean=0, std=self.initializer_std)
+        # else:
+        #     for p in self.parameters():
+        #         if p.dim() > 1:
+        #             normal_(p, mean=0, std=self.initializer_std)
 
         self.to(device)
 
