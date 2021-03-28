@@ -39,4 +39,4 @@ class PositionwiseFeedForward(nn.Module):
 
         output += residual
 
-        return x
+        return output
