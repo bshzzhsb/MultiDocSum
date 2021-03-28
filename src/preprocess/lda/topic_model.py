@@ -20,7 +20,8 @@ class TopicModel(object):
         logger.info('Loading checkpoint from %s' % checkpoint)
         checkpoint = torch.load(checkpoint, map_location=lambda storage, loc: storage)
         args.num_topics = checkpoint['num_topics']
-        self.model = ProdLDA(args, checkpoint=checkpoint)
+        self.model = ProdLDA(args.num_topics, args.enc1_units, args.enc2_units, args.vocab_size, args.variance,
+                             args.dropout, args.device, args.init_mult, checkpoint=checkpoint)
 
     def get_topic(self, src, num_top_topic, num_top_word):
         self.model.eval()

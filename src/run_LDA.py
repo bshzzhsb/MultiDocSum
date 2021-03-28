@@ -52,7 +52,7 @@ def model_builder(checkpoint=None):
 
 def train(spm):
     vocab_save_file = args.model_path + '/vocab.pkl'
-    model_save_file = args.model_path + 'prod_lda_model.pt'
+    model_save_file = args.model_path + '/prodlda_model.pt'
 
     stop_words = load_stop_words(args.stop_words_file)
     # stop_words = 'english'
@@ -134,7 +134,6 @@ def predict(spm):
     with open(args.vocab_file, 'rb') as file:
         vocab = pickle.load(file)
         args.vocab_size = len(vocab)
-        file.close()
 
     topic_model = TopicModel(args, vocab, args.device, args.checkpoint)
     emb = topic_model.model.decoder.weight.detach().numpy().T
@@ -142,7 +141,7 @@ def predict(spm):
 
     with open(args.data_path + '/train/MultiNews.30.train.11.json') as file:
         dataset = json.load(file)
-        with open('../results/prod_lda/n_topic_100/topics.txt', 'w', encoding='utf-8') as out:
+        with open('../results/prodlda/topics.txt', 'w', encoding='utf-8') as out:
             for data in dataset:
                 srcs = [[spm.DecodeIds(src)] for src in data['src']]
                 for src in srcs:
@@ -150,6 +149,37 @@ def predict(spm):
                         topic_model.get_topic(src, num_top_topic=5, num_top_word=10)
                     out.write(str([(vocab[word], prob) for (word, prob) in zip(top_n_words, top_n_words_probs)]) + '\n')
                     out.write(src[0] + '\n')
+
+
+def preprocess(spm):
+    assert args.checkpoint is not None
+
+    with open(args.vocab_file, 'rb') as file:
+        vocab = pickle.load(file)
+        args.vocab_size = len(vocab)
+
+    topic_model = TopicModel(args, vocab, args.device, args.checkpoint)
+
+    phases = ['train', 'test', 'dev']
+
+    for phase in phases:
+        pts = sorted(glob.glob(args.data_path + '/' + phase + '/*.[0-9]*.json'))
+        assert len(pts) > 0
+        for pt in pts:
+            with open(pt) as pt_file:
+                print('loading file %s' % pt)
+                data = json.load(pt_file)
+                pt_name = pt_file.name.split('/')[-1]
+            with open('../results/data/' + phase + '/' + pt_name, 'w', encoding='utf-8') as out_file:
+                for i, item in enumerate(data):
+                    tgt = [item['tgt_str']]
+                    top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
+                        topic_model.get_topic(tgt, num_top_topic=5, num_top_word=10)
+                    top_n_words = [vocab[idx] for idx in top_n_words]
+                    top_n_words_ids = [idx[0] for idx in spm.Encode(top_n_words)]
+                    data[i]['tgt_topic'] = [(word_id, prob)
+                                            for (word_id, prob) in zip(top_n_words_ids, top_n_words_probs.tolist())]
+                json.dump(data, out_file)
 
 
 def get_topic_words(beta, vocab, n_top_words=10):
@@ -183,6 +213,8 @@ def main():
         test()
     elif args.mode == 'predict':
         predict(spm)
+    elif args.mode == 'preprocess':
+        preprocess(spm)
 
 
 if __name__ == '__main__':

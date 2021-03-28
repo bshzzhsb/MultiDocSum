@@ -33,6 +33,13 @@ def data_loader(data_path, phase='*', source='tgt', spm=None):
             for item in data:
                 for src in item['src']:
                     train_dataset.append(spm.DecodeIds(src))
+    elif source == 'all':
+        for pt in pts:
+            data = dataset_loader(pt)
+            for item in data:
+                train_dataset.append(item['tgt_str'])
+                for src in item['src']:
+                    train_dataset.append(spm.DecodeIds(src))
     else:
         raise NotImplementedError('source must in ["tgt", "src"]')
 
