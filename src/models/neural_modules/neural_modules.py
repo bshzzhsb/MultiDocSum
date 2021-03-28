@@ -6,10 +6,10 @@ import torch.nn.functional as F
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, n_position, d_pos, device):
+    def __init__(self, d_pos):
         super(PositionalEncoding, self).__init__()
-        pe = torch.FloatTensor(n_position, d_pos).to(device)
-        position = torch.arange(0, n_position).unsqueeze(-1)
+        pe = torch.FloatTensor(500, d_pos)
+        position = torch.arange(0, 500).unsqueeze(-1)
         weight = torch.exp(torch.arange(0, d_pos, 2, dtype=torch.float) * -(math.log(10000.0) / d_pos))
         pe[:, 0::2] = torch.sin(position * weight)
         pe[:, 1::2] = torch.cos(position * weight)

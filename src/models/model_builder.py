@@ -54,9 +54,7 @@ class MultiDocSum(nn.Module):
         self.enc_embed_dropout = nn.Dropout(self.dropout)
         self.dec_embed = nn.Embedding(self.vocab_size, self.embed_size, self.padding_idx)
         self.dec_embed_dropout = nn.Dropout(self.dropout)
-        self.enc_word_pos_embed = PositionalEncoding(self.max_para_len, self.embed_size // 2, device)
-        self.enc_sent_pos_embed = PositionalEncoding(self.max_para_num, self.embed_size // 2, device)
-        self.dec_pos_embed = PositionalEncoding(self.max_tgt_len, self.embed_size, device)
+        self.pos_embed = PositionalEncoding(self.embed_size // 2)
 
         if self.weight_sharing:
             self.dec_embed.weight = self.enc_word_embed.weight
@@ -127,10 +125,10 @@ class MultiDocSum(nn.Module):
         word_embed_out = word_embed_out * (self.embed_size ** 0.5)
 
         # [batch_size, n_blocks, n_tokens, d_model / 2]
-        word_pos_out = self.enc_word_pos_embed(src_word_pos)
+        word_pos_out = self.pos_embed(src_word_pos)
 
         # [batch_size, n_blocks, d_model / 2]
-        sent_pos_out = self.enc_sent_pos_embed(src_sent_pos)
+        sent_pos_out = self.pos_embed(src_sent_pos)
 
         # [batch_size, n_blocks, n_tokens, d_model / 2]
         sent_pos_out = torch.unsqueeze(sent_pos_out, 2).expand(-1, -1, self.max_para_len, -1)
@@ -177,7 +175,7 @@ class MultiDocSum(nn.Module):
         embed_out = embed_out * (self.embed_size ** 0.5)
 
         # [batch_size, tgt_len, d_model]
-        pos_embed_out = self.dec_pos_embed(tgt_pos)
+        pos_embed_out = self.pos_embed(tgt_pos)
 
         # [batch_size, tgt_len, d_model]
         embed_out = embed_out + pos_embed_out
