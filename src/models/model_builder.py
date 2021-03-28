@@ -35,6 +35,7 @@ class MultiDocSum(nn.Module):
         self.padding_idx = symbols['PAD']
         self.bos_idx = symbols['BOS']
         self.eos_idx = symbols['EOS']
+        self.topic = args.topic
 
         self.d_model = self.embed_size
         self.weight_sharing = args.weight_sharing
@@ -59,6 +60,11 @@ class MultiDocSum(nn.Module):
 
         if self.weight_sharing:
             self.dec_embed.weight = self.enc_word_embed.weight
+
+        if self.topic == 'sum':
+            self.topic_embed = nn.Embedding(self.vocab_size, self.embed_size)
+            if self.weight_sharing:
+                self.topic_embed.weight = self.enc_word_embed.weight
 
         self.transformer_encoder = TransformerEncoder(
             n_layers=self.enc_word_layers,
@@ -92,7 +98,8 @@ class MultiDocSum(nn.Module):
             d_inner_hidden=self.embed_size * 4,
             pos_win=self.pos_win,
             dropout=self.dropout,
-            device=device
+            device=device,
+            topic=self.topic
         )
 
         self.generator_fc = nn.Linear(self.embed_size, self.vocab_size)
@@ -163,7 +170,7 @@ class MultiDocSum(nn.Module):
 
     def decode(self, dec_input, enc_words_out, enc_sents_out, state=None):
         tgt_word, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias, \
-            tgt_src_sents_attn_bias, graph_attn_bias = dec_input
+            tgt_src_sents_attn_bias, graph_attn_bias, tgt_topic = dec_input
 
         # [batch_size, tgt_len, d_model]
         embed_out = self.dec_embed(tgt_word)
@@ -176,11 +183,13 @@ class MultiDocSum(nn.Module):
         embed_out = embed_out + pos_embed_out
         embed_out = self.dec_embed_dropout(embed_out)
 
+        topic_embed_out = self.topic_embed(tgt_topic)
+
         # [batch_size, tgt_len, d_model]
         dec_output = self.graph_decoder(
             embed_out, enc_words_out, enc_sents_out, tgt_self_attn_bias,
             tgt_src_words_attn_bias, tgt_src_sents_attn_bias, graph_attn_bias,
-            state=state
+            topic=topic_embed_out, state=state
         )
 
         # [batch_size * tgt_len, d_model]

@@ -123,4 +123,5 @@ def shards(state, shard_size, eval_only=False):
                 variables.extend(zip(torch.split(state[k], shard_size),
                                      [v_chunk.grad for v_chunk in v_split]))
         inputs, grads = zip(*variables)
+        # grads 作为 grad_tensor (权重) 再次计算梯度
         torch.autograd.backward(inputs, grads)

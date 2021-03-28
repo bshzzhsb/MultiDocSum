@@ -296,7 +296,7 @@ class MultiHeadTopicAttention(nn.Module):
 
     def __init__(self, n_heads, d_model, dropout=0):
         super(MultiHeadTopicAttention, self).__init__()
-        self.d_model = d_model,
+        self.d_model = d_model
         self.n_heads = n_heads
         self.dim_per_head = d_model // n_heads
         self.w_qs = nn.Linear(d_model, n_heads * self.dim_per_head)
@@ -324,6 +324,8 @@ class MultiHeadTopicAttention(nn.Module):
         attn = self.topic_attn(q, k, v, bias)
         # [batch_size * tgt_len, n_topic_words, d_model]
         attn = attn.view(batch_size * len_k, -1, self.d_model)
+
+        return attn
 
 
 class GraphAttention(nn.Module):

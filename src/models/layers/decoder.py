@@ -5,60 +5,6 @@ from models.neural_modules.neural_modules import PositionwiseFeedForward
 from models.layers.encoder import SelfAttentionPoolingLayer
 
 
-class TransformerDecoderLayer(nn.Module):
-
-    def __init__(self, n_heads, d_model, d_k, d_v, d_inner_hidden, dropout):
-        super(TransformerDecoderLayer, self).__init__()
-        self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
-        self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
-        self.dropout = nn.Dropout(dropout)
-
-        self.self_attn = MultiHeadAttention(n_heads, d_model, d_k, d_v, dropout)
-        self.context_attn = MultiHeadAttention(n_heads, d_model, d_k, d_v, dropout)
-
-        self.pos_ffd = PositionwiseFeedForward(d_model, d_inner_hidden, dropout)
-
-    def forward(self, dec_input, enc_output, self_attn_bias, dec_enc_attn_bias):
-        q = self.layer_norm_1(dec_input)
-        self_attn_output = self.self_attn(q, q, q, self_attn_bias)
-
-        self_attn_output = self.dropout(self_attn_output) + dec_input
-
-        q = self.layer_norm_2(self_attn_output)
-        context_attn_output = self.context_attn(q, enc_output, enc_output, dec_enc_attn_bias)
-
-        context_attn_output = self.dropout(context_attn_output) + self_attn_output
-
-        dec_output = self.pos_wise_ffd(context_attn_output)
-
-        return dec_output
-
-
-class TransformerDecoder(nn.Module):
-
-    def __init__(self, n_layers, n_heads, d_model, d_k, d_v, d_inner_hidden, dropout):
-        super(TransformerDecoder, self).__init__()
-        self.n_layers = n_layers
-
-        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
-
-        self.transformer_decoder_layers = nn.ModuleList([
-            TransformerDecoderLayer(
-                n_heads, d_model, d_k, d_v, d_inner_hidden, dropout
-            ) for _ in range(n_layers)
-        ])
-
-    def forward(self, dec_input, enc_output, dec_self_attn_bias, dec_enc_attn_bias):
-        for i in range(self.n_layers):
-            dec_output = self.transformer_decoder_layers[i](
-                dec_input, enc_output, dec_self_attn_bias, dec_enc_attn_bias)
-            dec_input = dec_output
-
-        dec_output = self.layer_norm(dec_output)
-
-        return dec_output
-
-
 class GraphDecoderLayer(nn.Module):
 
     def __init__(self, n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win, dropout, device, topic=None):
@@ -128,7 +74,7 @@ class GraphDecoder(nn.Module):
             # [batch_size * tgt_len, n_topic_words, d_model]
             dec_input = self.topic_attn(topic, dec_input, dec_input, topic_bias)
             # [batch_size, tgt_len, d_model]
-            dec_input = self.pooling(dec_input)
+            dec_input = self.pooling(dec_input, None)
 
         for i in range(self.n_layers):
             # [batch_size, len_q, d_model]

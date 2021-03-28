@@ -158,6 +158,7 @@ if __name__ == '__main__':
     parser.add_argument('--val_steps', default=10000, type=int,
                         help='The steps interval to evaluate the model performance')
     parser.add_argument('--pos_win', default=2.0, type=float, help='The parameter in graph attention')
+    parser.add_argument('--topic', default=None, type=str, choices=['doc', 'sum'])
 
     # model config
     parser.add_argument('--hidden_size', default=256, type=int)

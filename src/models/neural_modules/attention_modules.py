@@ -279,7 +279,7 @@ class TopicScaledDotProductAttention(nn.Module):
         weight = weight.transpose(1, 2).contiguous().view(batch_size, n_heads, -1, tgt_len)
 
         # [batch_size, n_heads, n_topic_words * tgt_len, dim_per_head]
-        attn = torch.matmul(weight, v.unsqueeze(1))
+        attn = torch.matmul(weight, v)
         # [batch_size, n_topic_words * tgt_len, d_model]
         attn = attn.transpose(1, 2).contiguous().view(batch_size, -1, dim_per_head * n_heads)
 

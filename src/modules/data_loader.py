@@ -59,6 +59,8 @@ class DataBatch(object):
             device=device
         )
 
+        tgt_topic = torch.tensor([inst[5] for inst in data], device=device)
+
         # [batch_size, max_para_num, n_heads, max_para_len, max_para_len]
         src_words_self_attn_bias = src_words_self_attn_bias.unsqueeze(2).unsqueeze(3) \
             .expand(-1, -1, self.n_heads, self.max_para_len, -1)
@@ -94,7 +96,7 @@ class DataBatch(object):
         enc_input = (src_words, src_words_pos, src_sents_pos, src_words_self_attn_bias,
                      src_sents_self_attn_bias, graph_attn_bias)
         dec_input = (tgt_words, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias,
-                     tgt_src_sents_attn_bias, graph_attn_bias)
+                     tgt_src_sents_attn_bias, graph_attn_bias, tgt_topic)
 
         return enc_input, dec_input, tgt_label, label_weight
 
@@ -293,7 +295,8 @@ class DataIterator(object):
         return xs
 
     def preprocess(self, ex):
-        src, tgt, tgt_str, graph = ex['src'], ex['tgt'], ex['tgt_str'], ex['sim_graph']
+        src, tgt, tgt_str, graph, tgt_topic = \
+            ex['src'], ex['tgt'], ex['tgt_str'], ex['sim_graph'], ex['tgt_topic']
 
         src = src[:self.max_para_num]
         src = [para[:self.max_para_len] for para in src]
@@ -305,7 +308,9 @@ class DataIterator(object):
         tgt_ids = tgt[:-1]
         label_ids = tgt[1:]
 
-        return src, tgt_ids, label_ids, tgt_str, graph
+        tgt_topic = [topic[0] for topic in tgt_topic]
+
+        return src, tgt_ids, label_ids, tgt_str, graph, tgt_topic
 
     def simple_batch_size_fn(self, new, count):
         src, tgt = new[0], new[1]
