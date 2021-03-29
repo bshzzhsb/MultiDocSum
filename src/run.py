@@ -10,6 +10,7 @@ from graph_sum.model import GraphSum
 from models.model_builder import MultiDocSum, init_params
 from model_topic_q.model_builder import MDSTopicQ
 from model_topic_kv.model_builder import MDSTopicKV
+from model_gat.model_builder import MDSGAT
 from modules.optimizer import build_optim
 from models.trainer_builder import build_trainer
 from models.predictor_builder import build_predictor
@@ -70,9 +71,12 @@ def train(device):
     elif args.model == 'MultiDocSum':
         model = MultiDocSum(args, symbols, spm, device)
     elif args.model == 'MDSTopicQ':
+        logger.warning('MDSTopicQ is deprecated!!!')
         model = MDSTopicQ(args, symbols, spm, device)
     elif args.model == 'MDSTopicKV':
         model = MDSTopicKV(args, symbols, spm, device)
+    elif args.model == 'MDSGAT':
+        model = MDSGAT(args, symbols, spm, device)
     else:
         raise NotImplementedError()
 
@@ -152,7 +156,7 @@ if __name__ == '__main__':
 
     # model-related arguments
     parser.add_argument('--model', default='MultiDocSum', type=str, help='The model to use',
-                        choices=['GraphSum', 'MultiDocSum', 'MDSTopicQ', 'MDSTopicKV'])
+                        choices=['GraphSum', 'MultiDocSum', 'MDSTopicQ', 'MDSTopicKV', 'MDSGAT'])
     parser.add_argument('--max_grad_norm', default=2.0, type=float, help='The max gradient norm')
     parser.add_argument('--initializer_range', default=0.02, type=int,
                         help='The standard deviation (std) of model normal initializer')

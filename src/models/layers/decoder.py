@@ -50,7 +50,7 @@ class GraphDecoderLayer(nn.Module):
 class GraphDecoder(nn.Module):
 
     def __init__(self, n_layers, n_heads, d_model, d_k, d_v, d_inner_hidden,
-                 tgt_len, pos_win, dropout, device):
+                 pos_win, dropout, device):
         super(GraphDecoder, self).__init__()
         self.n_layers = n_layers
 

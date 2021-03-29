@@ -104,7 +104,7 @@ class MDSTopicQ(nn.Module):
         self.generator_fc = nn.Linear(self.embed_size, self.vocab_size)
         if self.weight_sharing:
             self.generator_fc.weight = self.dec_embed.weight
-            self.generator_fc.bias = nn.Parameter(torch.Tensor(self.vocab_size), requires_grad=True)
+            self.generator_fc.bias = nn.Parameter(torch.zeros(self.vocab_size, dtype=torch.float), requires_grad=True)
 
         self.generator_log_softmax = nn.LogSoftmax(dim=-1)
 

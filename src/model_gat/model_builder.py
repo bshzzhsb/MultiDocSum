@@ -2,25 +2,16 @@ import torch
 import torch.nn as nn
 from torch.nn.init import normal_, constant_, xavier_uniform_
 
-from models.layers.encoder import TransformerEncoder, GraphEncoder
-from model_topic_kv.neural_modules.decoder import GraphDecoder
+from models.layers.encoder import TransformerEncoder
+from model_gat.neural_modules.encoder import GraphEncoder
+from models.layers.decoder import GraphDecoder
 from models.neural_modules.neural_modules import PositionalEncoding
 
 
-def init_params(initializer_std, model: nn.Module):
-    for m in model.modules():
-        if isinstance(m, nn.Linear):
-            xavier_uniform_(m.weight)
-            if m.bias is not None:
-                constant_(m.bias, 0.0)
-        elif isinstance(m, nn.Embedding):
-            normal_(m.weight, mean=0, std=initializer_std)
-
-
-class MDSTopicKV(nn.Module):
+class MDSGAT(nn.Module):
 
     def __init__(self, args, symbols, tokenizer, device, checkpoint=None):
-        super(MDSTopicKV, self).__init__()
+        super(MDSGAT, self).__init__()
         self.args = args
         self.tokenizer = tokenizer
         self.vocab_size = len(tokenizer)
@@ -56,11 +47,8 @@ class MDSTopicKV(nn.Module):
         self.enc_pos_embed = PositionalEncoding(self.embed_size // 2)
         self.dec_pos_embed = PositionalEncoding(self.embed_size)
 
-        self.topic_embed = nn.Embedding(self.vocab_size, self.embed_size)
-
         if self.weight_sharing:
             self.dec_embed.weight = self.enc_word_embed.weight
-            self.topic_embed.weight = self.enc_word_embed.weight
 
         self.transformer_encoder = TransformerEncoder(
             n_layers=self.enc_word_layers,
@@ -108,7 +96,6 @@ class MDSTopicKV(nn.Module):
         else:
             for p in self.parameters():
                 if p.dim() > 1:
-                    # normal_(p, mean=0, std=self.initializer_std)
                     xavier_uniform_(p)
 
         self.to(device)
@@ -165,7 +152,7 @@ class MDSTopicKV(nn.Module):
 
     def decode(self, dec_input, enc_words_out, enc_sents_out, state=None):
         tgt_word, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias, \
-            tgt_src_sents_attn_bias, graph_attn_bias, tgt_topic, tgt_topic_attn_bias = dec_input
+            tgt_src_sents_attn_bias, graph_attn_bias = dec_input[:6]
 
         # [batch_size, tgt_len, d_model]
         embed_out = self.dec_embed(tgt_word)
@@ -178,13 +165,11 @@ class MDSTopicKV(nn.Module):
         embed_out = embed_out + pos_embed_out
         embed_out = self.dec_embed_dropout(embed_out)
 
-        topic_embed_out = self.topic_embed(tgt_topic)
-
         # [batch_size, tgt_len, d_model]
         dec_output = self.graph_decoder(
             embed_out, enc_words_out, enc_sents_out, tgt_self_attn_bias,
             tgt_src_words_attn_bias, tgt_src_sents_attn_bias, graph_attn_bias,
-            topic_embed_out, tgt_topic_attn_bias, state=state
+            state=state
         )
 
         # [batch_size * tgt_len, d_model]

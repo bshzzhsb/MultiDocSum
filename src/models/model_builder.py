@@ -82,7 +82,6 @@ class MultiDocSum(nn.Module):
         self.enc_layer_norm = nn.LayerNorm(self.d_model, eps=1e-6)
 
         self.graph_decoder = GraphDecoder(
-            tgt_len=self.max_tgt_len,
             n_layers=self.dec_graph_layers,
             n_heads=self.n_heads,
             d_model=self.embed_size,
@@ -97,7 +96,7 @@ class MultiDocSum(nn.Module):
         self.generator_fc = nn.Linear(self.embed_size, self.vocab_size)
         if self.weight_sharing:
             self.generator_fc.weight = self.dec_embed.weight
-            self.generator_fc.bias = nn.Parameter(torch.Tensor(self.vocab_size), requires_grad=True)
+            self.generator_fc.bias = nn.Parameter(torch.zeros(self.vocab_size, dtype=torch.float), requires_grad=True)
 
         self.generator_log_softmax = nn.LogSoftmax(dim=-1)
 
