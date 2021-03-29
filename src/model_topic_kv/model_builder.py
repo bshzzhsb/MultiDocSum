@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.init import normal_, constant_, xavier_uniform_
 
 from models.layers.encoder import TransformerEncoder, GraphEncoder
-from models.layers.decoder import GraphDecoder
+from model_topic_kv.neural_modules.decoder import GraphDecoder
 from models.neural_modules.neural_modules import PositionalEncoding
 
 
@@ -17,10 +17,10 @@ def init_params(initializer_std, model: nn.Module):
             normal_(m.weight, mean=0, std=initializer_std)
 
 
-class MultiDocSum(nn.Module):
+class MDSTopicKV(nn.Module):
 
     def __init__(self, args, symbols, tokenizer, device, checkpoint=None):
-        super(MultiDocSum, self).__init__()
+        super(MDSTopicKV, self).__init__()
         self.args = args
         self.tokenizer = tokenizer
         self.vocab_size = len(tokenizer)
@@ -56,8 +56,11 @@ class MultiDocSum(nn.Module):
         self.enc_pos_embed = PositionalEncoding(self.embed_size // 2)
         self.dec_pos_embed = PositionalEncoding(self.embed_size)
 
+        self.topic_embed = nn.Embedding(self.vocab_size, self.embed_size)
+
         if self.weight_sharing:
             self.dec_embed.weight = self.enc_word_embed.weight
+            self.topic_embed.weight = self.enc_word_embed.weight
 
         self.transformer_encoder = TransformerEncoder(
             n_layers=self.enc_word_layers,
@@ -82,7 +85,6 @@ class MultiDocSum(nn.Module):
         self.enc_layer_norm = nn.LayerNorm(self.d_model, eps=1e-6)
 
         self.graph_decoder = GraphDecoder(
-            tgt_len=self.max_tgt_len,
             n_layers=self.dec_graph_layers,
             n_heads=self.n_heads,
             d_model=self.embed_size,
@@ -120,17 +122,15 @@ class MultiDocSum(nn.Module):
 
         # [batch_size, n_blocks, n_tokens, d_model / 2]
         word_pos_out = self.enc_pos_embed(src_word_pos)
-        word_pos_out.requires_grad = False
 
         # [batch_size, n_blocks, d_model / 2]
         sent_pos_out = self.enc_pos_embed(src_sent_pos)
-        sent_pos_out.requires_grad = False
 
         # [batch_size, n_blocks, n_tokens, d_model / 2]
         sent_pos_out = torch.unsqueeze(sent_pos_out, 2).expand(-1, -1, self.max_para_len, -1)
 
         # [batch_size, n_blocks, n_tokens, d_model]
-        combined_pos_enc = torch.cat([word_pos_out, sent_pos_out], dim=-1)
+        combined_pos_enc = torch.cat((word_pos_out, sent_pos_out), dim=-1)
 
         # [batch_size, n_blocks, n_tokens, d_model]
         embed_out = word_embed_out + combined_pos_enc
@@ -164,7 +164,7 @@ class MultiDocSum(nn.Module):
 
     def decode(self, dec_input, enc_words_out, enc_sents_out, state=None):
         tgt_word, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias, \
-            tgt_src_sents_attn_bias, graph_attn_bias = dec_input[:6]
+            tgt_src_sents_attn_bias, graph_attn_bias, tgt_topic, tgt_topic_attn_bias = dec_input
 
         # [batch_size, tgt_len, d_model]
         embed_out = self.dec_embed(tgt_word)
@@ -172,17 +172,18 @@ class MultiDocSum(nn.Module):
 
         # [batch_size, tgt_len, d_model]
         pos_embed_out = self.dec_pos_embed(tgt_pos)
-        pos_embed_out.requires_grad = False
 
         # [batch_size, tgt_len, d_model]
         embed_out = embed_out + pos_embed_out
         embed_out = self.dec_embed_dropout(embed_out)
 
+        topic_embed_out = self.topic_embed(tgt_topic)
+
         # [batch_size, tgt_len, d_model]
         dec_output = self.graph_decoder(
             embed_out, enc_words_out, enc_sents_out, tgt_self_attn_bias,
             tgt_src_words_attn_bias, tgt_src_sents_attn_bias, graph_attn_bias,
-            state=state
+            topic_embed_out, tgt_topic_attn_bias, state=state
         )
 
         # [batch_size * tgt_len, d_model]

@@ -9,12 +9,16 @@ class GraphDecoderLayer(nn.Module):
     def __init__(self, n_heads, d_model, d_k, d_v, d_inner_hidden, pos_win, dropout, device, topic=None):
         super(GraphDecoderLayer, self).__init__()
         self.topic = topic
+        self.n_heads = n_heads
 
         self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
         self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
-        self.dropout_1 = nn.Dropout(dropout)
-        self.dropout_2 = nn.Dropout(dropout)
+        self.layer_norm_3 = nn.LayerNorm(d_model, eps=1e-6)
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+        self.dropout3 = nn.Dropout(dropout)
 
+        self.topic_attn = MultiHeadAttention(n_heads, d_model, d_k, d_v, dropout)
         self.self_attn = MultiHeadAttention(n_heads, d_model, d_k, d_v, dropout)
         self.multi_head_hierarchical_attn = MultiHeadHierarchicalAttention(
             pos_win, d_k, d_v, d_model, device, n_heads, dropout, topic=topic
@@ -24,21 +28,26 @@ class GraphDecoderLayer(nn.Module):
 
     def forward(self, dec_input, enc_words_output, enc_sents_output, self_attn_bias,
                 dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
-                cache=None):
-        # [batch_size, tgt_len, d_model]
+                topic_embed_out, tgt_topic_attn_bias, cache=None):
+        topic_bias = dec_input
         q = self.layer_norm_1(dec_input)
+        topic_attn_output = self.topic_attn(q, topic_embed_out, topic_embed_out, tgt_topic_attn_bias)
+        topic_attn_output = self.dropout1(topic_attn_output) + dec_input
+
+        # [batch_size, tgt_len, d_model]
+        q = self.layer_norm_2(topic_attn_output)
         # [batch_size, tgt_len, d_model]
         self_attn_output = self.self_attn(q, q, q, self_attn_bias, cache=cache, type='self')
-        self_attn_output = self.dropout_1(self_attn_output) + dec_input
+        self_attn_output = self.dropout2(self_attn_output) + topic_attn_output
 
-        q = self.layer_norm_2(self_attn_output)
+        q = self.layer_norm_3(self_attn_output)
         # [batch_size, tgt_len, d_model]
         hier_attn_output = self.multi_head_hierarchical_attn(
             q, enc_sents_output, enc_sents_output, enc_words_output, enc_words_output,
             dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
             cache=cache
         )
-        hier_attn_output = self.dropout_2(hier_attn_output) + self_attn_output
+        hier_attn_output = self.dropout3(hier_attn_output) + self_attn_output
 
         # [batch_size, len_q, d_model]
         dec_output = self.pos_ffd(hier_attn_output)
@@ -50,7 +59,7 @@ class GraphDecoderLayer(nn.Module):
 class GraphDecoder(nn.Module):
 
     def __init__(self, n_layers, n_heads, d_model, d_k, d_v, d_inner_hidden,
-                 tgt_len, pos_win, dropout, device):
+                 pos_win, dropout, device):
         super(GraphDecoder, self).__init__()
         self.n_layers = n_layers
 
@@ -64,12 +73,13 @@ class GraphDecoder(nn.Module):
 
     def forward(self, dec_input, enc_words_output, enc_sents_output, dec_self_attn_bias,
                 dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
-                state=None):
+                topic_embed_out, tgt_topic_attn_bias, state=None):
         for i in range(self.n_layers):
             # [batch_size, len_q, d_model]
             dec_output = self.graph_decoder_layers[i](
-                dec_input, enc_words_output, enc_sents_output,
-                dec_self_attn_bias, dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
+                dec_input, enc_words_output, enc_sents_output, dec_self_attn_bias,
+                dec_enc_words_attn_bias, dec_enc_sents_attn_bias, graph_attn_bias,
+                topic_embed_out, tgt_topic_attn_bias,
                 cache=state.cache['layer_{}'.format(i)] if state is not None and state.cache is not None else None
             )
             dec_input = dec_output

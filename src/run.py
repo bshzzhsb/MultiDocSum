@@ -8,6 +8,8 @@ from functools import partial
 from modules.data_loader import DataLoader, load_dataset
 from graph_sum.model import GraphSum
 from models.model_builder import MultiDocSum, init_params
+from model_topic_q.model_builder import MDSTopicQ
+from model_topic_kv.model_builder import MDSTopicKV
 from modules.optimizer import build_optim
 from models.trainer_builder import build_trainer
 from models.predictor_builder import build_predictor
@@ -67,6 +69,10 @@ def train(device):
         model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
     elif args.model == 'MultiDocSum':
         model = MultiDocSum(args, symbols, spm, device)
+    elif args.model == 'MDSTopicQ':
+        model = MDSTopicQ(args, symbols, spm, device)
+    elif args.model == 'MDSTopicKV':
+        model = MDSTopicKV(args, symbols, spm, device)
     else:
         raise NotImplementedError()
 
@@ -142,10 +148,11 @@ if __name__ == '__main__':
                         help='If True, batch size will be the maximum number of tokens in one batch.'
                              'else, batch size will be the maximum number of examples in one batch')
     parser.add_argument('--max_pos_embed', default=512, type=int, help='Max position embeddings')
+    parser.add_argument('--num_topic_words', default=10, type=int)
 
     # model-related arguments
-    parser.add_argument('--model', default='MultiDocSum', type=str, choices=['GraphSum', 'MultiDocSum'],
-                        help='The model to use')
+    parser.add_argument('--model', default='MultiDocSum', type=str, help='The model to use',
+                        choices=['GraphSum', 'MultiDocSum', 'MDSTopicQ', 'MDSTopicKV'])
     parser.add_argument('--max_grad_norm', default=2.0, type=float, help='The max gradient norm')
     parser.add_argument('--initializer_range', default=0.02, type=int,
                         help='The standard deviation (std) of model normal initializer')

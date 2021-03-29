@@ -98,10 +98,8 @@ class GraphEncoderLayer(nn.Module):
             n_heads, d_model, d_k, d_v, pos_win, dropout
         )
 
-        self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
-        self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
-        self.dropout_1 = nn.Dropout(dropout)
-        self.dropout_2 = nn.Dropout(dropout)
+        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
+        self.dropout = nn.Dropout(dropout)
         self.pos_ffd = PositionwiseFeedForward(d_model, d_inner_hidden, dropout)
 
     def forward(self, enc_input, bias, graph_attn_bias):
@@ -111,10 +109,10 @@ class GraphEncoderLayer(nn.Module):
         :param graph_attn_bias: [batch_size, n_heads, n_blocks, n_blocks]
         :return: [batch_size, n_blocks, d_model]
         """
-        q = self.layer_norm_1(enc_input)
+        q = self.layer_norm(enc_input)
         # [batch_size, n_blocks, d_model]
         attn_output = self.multi_head_structure_attn(q, q, q, bias, graph_attn_bias)
-        attn_output = self.dropout_1(attn_output) + enc_input
+        attn_output = self.dropout(attn_output) + enc_input
 
         # [batch_size, n_blocks, d_model]
         out = self.pos_ffd(attn_output)

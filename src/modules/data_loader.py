@@ -21,6 +21,7 @@ class DataBatch(object):
         self.max_para_num = self.args.max_para_num
         self.max_para_len = self.args.max_para_len
         self.max_tgt_len = self.args.max_tgt_len
+        self.n_topic_words = self.args.num_topic_words
         self.pad_idx = pad_idx
 
         if data is not None:
@@ -49,7 +50,7 @@ class DataBatch(object):
                 device=device
             )
 
-        tgt_words, tgt_pos, tgt_self_attn_bias = self._pad_tgt_batch_data(
+        tgt_words, tgt_pos, tgt_self_attn_bias, tgt_topic_attn_bias = self._pad_tgt_batch_data(
             insts=[inst[1] for inst in data],
             device=device
         )
@@ -58,8 +59,6 @@ class DataBatch(object):
             insts=[inst[2] for inst in data],
             device=device
         )
-
-        tgt_topic = torch.tensor([inst[5] for inst in data], device=device)
 
         # [batch_size, max_para_num, n_heads, max_para_len, max_para_len]
         src_words_self_attn_bias = src_words_self_attn_bias.unsqueeze(2).unsqueeze(3) \
@@ -93,10 +92,14 @@ class DataBatch(object):
         tgt_label = tgt_label.view(-1, 1)
         label_weight = label_weight.view(-1, 1)
 
+        tgt_topic = torch.tensor([inst[5] for inst in data], device=device)
+        tgt_topic_attn_bias = tgt_topic_attn_bias.unsqueeze(1).unsqueeze(3)\
+            .expand(-1, self.n_heads, -1, self.n_topic_words)
+
         enc_input = (src_words, src_words_pos, src_sents_pos, src_words_self_attn_bias,
                      src_sents_self_attn_bias, graph_attn_bias)
         dec_input = (tgt_words, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias,
-                     tgt_src_sents_attn_bias, graph_attn_bias, tgt_topic)
+                     tgt_src_sents_attn_bias, graph_attn_bias, tgt_topic, tgt_topic_attn_bias)
 
         return enc_input, dec_input, tgt_label, label_weight
 
@@ -153,6 +156,11 @@ class DataBatch(object):
         tgt_words = torch.tensor(tgt_words, dtype=torch.int64, device=device)
 
         # [batch_size, max_tgt_len]
+        tgt_topic_attn_bias = [[0.0] * len(inst) + [-1e18] * (self.max_tgt_len - len(inst))
+                               for inst in insts]
+        tgt_topic_attn_bias = torch.tensor(tgt_topic_attn_bias, dtype=torch.float, device=device)
+
+        # [batch_size, max_tgt_len]
         tgt_pos = [list(range(0, len(inst))) + [0] * (self.max_tgt_len - len(inst))
                    for inst in insts]
         tgt_pos = torch.tensor(tgt_pos, dtype=torch.int64, device=device)
@@ -164,7 +172,7 @@ class DataBatch(object):
             torch.tensor(tgt_self_attn_bias, dtype=torch.float32, device=device), diagonal=1
         ) * -1e18
 
-        return [tgt_words, tgt_pos, tgt_self_attn_bias]
+        return [tgt_words, tgt_pos, tgt_self_attn_bias, tgt_topic_attn_bias]
 
     def _pad_label_batch_data(self, insts, device):
         # [batch_size, max_tgt_len]
