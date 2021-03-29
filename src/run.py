@@ -76,8 +76,8 @@ def train(device):
     else:
         raise NotImplementedError()
 
-    init = partial(init_params, args.initializer_range)
-    model.apply(init)
+    # init = partial(init_params, args.initializer_range)
+    # model.apply(init)
 
     optim = build_optim(args, model, checkpoint)
 
@@ -177,11 +177,11 @@ if __name__ == '__main__':
 
     # optimizer-related arguments
     parser.add_argument('--optimizer', default='adam', type=str, help='The optimizer used in training')
-    parser.add_argument('--lr', default=3, type=float, help='Learning rate of the model in training')
+    parser.add_argument('--lr', default=2, type=float, help='Learning rate of the model in training')
     parser.add_argument('--lr_scheduler', default='noam', type=str, help='The decay method of learning rate')
     parser.add_argument('--beta1', default=0.9, type=float, help='Param for Adam optimizer')
     parser.add_argument('--beta2', default=0.998, type=float, help='Param for Adam optimizer')
-    parser.add_argument('--warmup_steps', default=8000, type=int,
+    parser.add_argument('--warmup_steps', default=4000, type=int,
                         help='The training steps to perform linear learning rate warmup')
 
     parser.add_argument('--max_generator_batches', default=32, type=int,
