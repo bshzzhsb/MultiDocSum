@@ -797,7 +797,6 @@ just
 k
 ke
 keep
-keep 	keeps
 keeps
 kept
 keys
@@ -980,6 +979,7 @@ normally
 nos
 not
 noted
+notes
 nothing
 notwithstanding
 novel
@@ -1054,6 +1054,7 @@ parting
 parts
 past
 pe
+people
 per
 perhaps
 pf
@@ -1263,6 +1264,7 @@ taking
 tc
 td
 tell
+tells
 ten
 tends
 test
@@ -1342,6 +1344,8 @@ thru
 thus
 til
 till
+time
+times
 tip
 tis
 tj
@@ -1351,6 +1355,7 @@ tn
 to
 today
 together
+told
 too
 took
 top
@@ -1537,6 +1542,7 @@ year
 years
 yes
 yet
+york
 you
 you'd
 you'll
