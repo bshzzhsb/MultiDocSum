@@ -1251,7 +1251,6 @@ sufficiently
 suggest
 sup
 sure
-sure 	t
 sv
 sy
 system
