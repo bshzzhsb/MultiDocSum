@@ -395,12 +395,12 @@ class TopicAttention(nn.Module):
 
     def forward(self, output, enc_output, topics):
         """
-        :param output: [batch_size, n_blocks, d_hidden]
-        :param enc_output: [batch_size, n_blocks, d_hidden]
-        :param topics: [n_topics, topic_vocab_size]
-        :return: [batch_size, n_blocks, n_topics]
+        :param output: [batch_size, n_blocks, d_model]
+        :param enc_output: [batch_size, n_blocks, d_model]
+        :param topics: [batch_size, n_topic_words, d_model]
+        :return: [batch_size, n_blocks, d_model]
         """
-        batch_size, n_blocks, n_topics = enc_output.size(0), enc_output.size(1), topics.size(0)
+        batch_size, n_blocks, n_topic_words = enc_output.size(0), enc_output.size(1), topics.size(1)
 
         # [batch_size, n_topics, n_blocks, d_hidden]
         output = output.repeat(n_topics, 1, 1, 1).transpose(0, 1)

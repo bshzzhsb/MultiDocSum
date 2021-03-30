@@ -31,7 +31,8 @@ class GraphDecoderLayer(nn.Module):
                 topic_embed_out, tgt_topic_attn_bias, cache=None):
         topic_bias = dec_input
         q = self.layer_norm_1(dec_input)
-        topic_attn_output = self.topic_attn(q, topic_embed_out, topic_embed_out, tgt_topic_attn_bias)
+        topic_attn_output = self.topic_attn(q, topic_embed_out, topic_embed_out, tgt_topic_attn_bias,
+                                            cache=cache, type='context')
         topic_attn_output = self.dropout1(topic_attn_output) + dec_input
 
         # [batch_size, tgt_len, d_model]

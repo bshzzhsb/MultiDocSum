@@ -69,14 +69,14 @@ def train(device):
     if args.model == 'GraphSum':
         model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
     elif args.model == 'MultiDocSum':
-        model = MultiDocSum(args, symbols, spm, device)
+        model = MultiDocSum(args, symbols, spm, device, checkpoint)
     elif args.model == 'MDSTopicQ':
         logger.warning('MDSTopicQ is deprecated!!!')
-        model = MDSTopicQ(args, symbols, spm, device)
+        model = MDSTopicQ(args, symbols, spm, device, checkpoint)
     elif args.model == 'MDSTopicKV':
-        model = MDSTopicKV(args, symbols, spm, device)
+        model = MDSTopicKV(args, symbols, spm, device, checkpoint)
     elif args.model == 'MDSGAT':
-        model = MDSGAT(args, symbols, spm, device)
+        model = MDSGAT(args, symbols, spm, device, checkpoint)
     else:
         raise NotImplementedError()
 
@@ -108,15 +108,19 @@ def test(device):
                'EOP': spm.PieceToId('<P>'), 'EOQ': spm.PieceToId('<Q>'),
                'UNK': spm.PieceToId('<UNK>')}
 
-    model = GraphSum(
-        args,
-        padding_idx=symbols['PAD'],
-        bos_idx=symbols['BOS'],
-        eos_idx=symbols['EOS'],
-        tokenizer=spm,
-        device=device,
-        checkpoint=checkpoint
-    )
+    if args.model == 'GraphSum':
+        model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
+    elif args.model == 'MultiDocSum':
+        model = MultiDocSum(args, symbols, spm, device, checkpoint)
+    elif args.model == 'MDSTopicQ':
+        logger.warning('MDSTopicQ is deprecated!!!')
+        model = MDSTopicQ(args, symbols, spm, device, checkpoint)
+    elif args.model == 'MDSTopicKV':
+        model = MDSTopicKV(args, symbols, spm, device, checkpoint)
+    elif args.model == 'MDSGAT':
+        model = MDSGAT(args, symbols, spm, device, checkpoint)
+    else:
+        raise NotImplementedError()
     model.eval()
 
     test_iter = DataLoader(args, load_dataset(args, 'test', shuffle=False), symbols,

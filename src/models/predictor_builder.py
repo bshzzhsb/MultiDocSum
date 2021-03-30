@@ -101,8 +101,11 @@ class Translator(object):
         batch_size = self.batch_size
         beam_size = self.beam_size
 
-        enc_input = batch.enc_input
+        enc_input, dec_input = batch.enc_input, batch.dec_input
         _, _, _, src_words_self_attn_bias, src_sents_self_attn_bias, graph_attn_bias = enc_input
+        tgt_topic, tgt_topic_attn_bias = dec_input[6:]
+        tgt_topic = tile(tgt_topic, beam_size, 0)
+        tgt_topic_attn_bias = tile(tgt_topic_attn_bias[:, :, 0].unsqueeze(2), beam_size, 0)
 
         # [batch_size, max_para_num, n_heads, 1, max_para_len]
         tgt_src_words_attn_bias = src_words_self_attn_bias[:, :, :, 0].unsqueeze(3)
@@ -143,7 +146,7 @@ class Translator(object):
             pre_pos = torch.full_like(pre_ids, step, dtype=torch.int64, device=self.device)
 
             dec_input = (pre_ids, pre_pos, None, pre_src_words_attn_bias,
-                         pre_src_sents_attn_bias, pre_graph_attn_bias)
+                         pre_src_sents_attn_bias, pre_graph_attn_bias, tgt_topic, tgt_topic_attn_bias)
 
             logits = self.model.decode(dec_input, enc_words_output, enc_sents_output, dec_state)
             vocab_size = logits.size(-1)
@@ -222,6 +225,8 @@ class Translator(object):
             enc_sents_output = enc_sents_output.index_select(0, select_indices)
             pre_src_words_attn_bias = pre_src_words_attn_bias.index_select(0, select_indices)
             pre_src_sents_attn_bias = pre_src_sents_attn_bias.index_select(0, select_indices)
+            tgt_topic = tgt_topic.index_select(0, select_indices)
+            tgt_topic_attn_bias = tgt_topic_attn_bias.index_select(0, select_indices)
 
             dec_state.map_batch_fn(lambda state, dim: state.index_select(dim, select_indices))
 
