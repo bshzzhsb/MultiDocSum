@@ -287,6 +287,7 @@ ago
 ah
 ahead
 ai
+ain
 ain't
 aint
 al
@@ -479,6 +480,7 @@ cy
 cz
 d
 dare
+daren
 daren't
 darent
 date
@@ -663,6 +665,7 @@ gw
 gy
 h
 had
+hadn
 hadn't
 hadnt
 half
@@ -695,8 +698,8 @@ herein
 heres
 hereupon
 hers
+herse
 herself
-herse”
 hes
 hi
 hid
@@ -704,8 +707,8 @@ high
 higher
 highest
 him
+himse
 himself
-himse”
 his
 hither
 hk
@@ -781,8 +784,8 @@ it's
 itd
 itll
 its
+itse
 itself
-itse”
 ive
 j
 je
@@ -867,6 +870,7 @@ man
 many
 may
 maybe
+mayn
 mayn't
 maynt
 mc
@@ -885,6 +889,7 @@ mh
 microsoft
 might
 might've
+mightn
 mightn't
 mightnt
 mil
@@ -898,6 +903,7 @@ ml
 mm
 mn
 mo
+mon
 more
 moreover
 most
@@ -915,14 +921,15 @@ much
 mug
 must
 must've
+mustn
 mustn't
 mustnt
 mv
 mw
 mx
 my
+myse
 myself
-myse”
 mz
 n
 na
@@ -939,6 +946,7 @@ necessary
 need
 needed
 needing
+needn
 needn't
 neednt
 needs
@@ -1022,6 +1030,7 @@ other
 others
 otherwise
 ought
+oughtn
 oughtn't
 oughtnt
 our
@@ -1165,6 +1174,7 @@ several
 sg
 sh
 shall
+shan
 shan't
 shant
 she
