@@ -108,8 +108,8 @@ class MDSTopicKV(nn.Module):
         else:
             for p in self.parameters():
                 if p.dim() > 1:
-                    # normal_(p, mean=0, std=self.initializer_std)
-                    xavier_uniform_(p)
+                    normal_(p, mean=0, std=self.initializer_std)
+                    # xavier_uniform_(p)
 
         self.to(device)
 
