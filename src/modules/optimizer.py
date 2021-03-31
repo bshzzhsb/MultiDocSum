@@ -46,12 +46,13 @@ class Optimizer(object):
         self.eps = eps
         self._step = 0
         self.betas = (beta1, beta2)
+        self.model_size = model_size
         self.lr_scheduler = lr_scheduler
+        self.train_steps = train_steps
+
         self.warmup_steps = warmup_steps
         if self.lr_scheduler == 'linear_warmup_decay':
-            self.warmup_steps *= warmup_prop
-        self.model_size = model_size
-        self.train_steps = train_steps
+            self.warmup_steps = self.train_steps * warmup_prop
 
         self.last_ppl = None
         self.start_decay = False
