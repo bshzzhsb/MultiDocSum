@@ -397,6 +397,7 @@ bi
 big
 bill
 billion
+bin
 biol
 bj
 bm
@@ -716,6 +717,7 @@ hm
 hn
 home
 homepage
+hong
 hopefully
 how
 how'd
@@ -810,6 +812,7 @@ knew
 know
 known
 knows
+kong
 kp
 kr
 kw
@@ -1142,6 +1145,7 @@ s
 sa
 said
 same
+san
 saw
 say
 saying
