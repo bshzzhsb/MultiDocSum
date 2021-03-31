@@ -1,9 +1,10 @@
 import torch
+import torch.nn as nn
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
 
 
-def build_optim(args, model, checkpoint):
+def build_optim(args, model: nn.Module, checkpoint):
     optimizer = Optimizer(
         args.optimizer, args.lr, args.max_grad_norm,
         weight_decay=args.weight_decay,
@@ -16,7 +17,26 @@ def build_optim(args, model, checkpoint):
         warmup_prop=args.warmup_prop
     )
 
-    optimizer.set_parameters(list(model.named_parameters()))
+    decay = set()
+    no_decay = set()
+    for m in model.modules():
+        if isinstance(m, nn.Linear):
+            decay.add(m.weight)
+            if m.bias is not None:
+                no_decay.add(m.bias)
+        elif isinstance(m, nn.Embedding):
+            decay.add(m.weight)
+        elif isinstance(m, nn.LayerNorm):
+            no_decay.add(m.weight)
+            if m.bias is not None:
+                no_decay.add(m.bias)
+
+    assert len(list(model.parameters())) == len(decay) + len(no_decay)
+    groups = [
+        {'params': list(decay), 'weight_decay': optimizer.weight_decay},
+        {'params': list(no_decay), 'weight_decay': 0.0}
+    ]
+    optimizer.set_parameters(groups)
 
     if checkpoint:
         optimizer.optimizer.load_state_dict(checkpoint['optim'])
@@ -58,20 +78,20 @@ class Optimizer(object):
         self.start_decay = False
 
         self.params = []
-        self.sparse_params = []
 
         self.optimizer = None
 
-    def set_parameters(self, params):
-        for k, p in params:
-            if p.requires_grad:
-                self.params.append(p)
-        self.optimizer = optim.Adam(self.params, lr=self.learning_rate, betas=self.betas,
-                                    weight_decay=self.weight_decay, eps=self.eps)
+    def set_parameters(self, groups):
+        self.params = [[p for p in group['params'] if p.requires_grad] for group in groups]
+        if self.method.lower() == 'adam':
+            self.optimizer = optim.Adam(groups, lr=self.learning_rate, betas=self.betas, eps=self.eps)
+        elif self.method.lower() == 'adamw':
+            self.optimizer = optim.AdamW(groups, lr=self.learning_rate, betas=self.betas, eps=self.eps)
 
     def _set_rate(self, learning_rate):
         self.learning_rate = learning_rate
-        self.optimizer.param_groups[0]['lr'] = self.learning_rate
+        for i in range(len(self.params)):
+            self.optimizer.param_groups[i]['lr'] = self.learning_rate
 
     def step(self):
         self._step += 1
@@ -89,5 +109,6 @@ class Optimizer(object):
                     (1 - self._step / self.train_steps))
 
         if self.max_grad_norm:
-            clip_grad_norm_(self.params, self.max_grad_norm)
+            for i in range(len(self.params)):
+                clip_grad_norm_(self.params[i], self.max_grad_norm)
         self.optimizer.step()
