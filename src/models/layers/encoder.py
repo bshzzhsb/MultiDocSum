@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 from models.neural_modules.attention import \
-    MultiHeadAttention, MultiHeadPooling, MultiHeadStructureAttention, GraphAttention
+    MultiHeadAttention, MultiHeadPooling, MultiHeadStructureAttention
 from models.neural_modules.neural_modules import PositionwiseFeedForward
 
 
@@ -160,28 +160,3 @@ class GraphEncoder(nn.Module):
 
         # [batch_size, n_blocks, d_model]
         return enc_output
-
-
-class GATLayer(nn.Module):
-
-    def __init__(self, n_heads, d_model, dropout, alpha):
-        super(GATLayer, self).__init__()
-        self.dropout_1 = nn.Dropout(dropout)
-        self.dropout_2 = nn.Dropout(dropout)
-        self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
-        self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
-
-        self.attn = GraphAttention(n_heads, d_model, d_model, dropout, alpha)
-        self.out_attn = GraphAttention(1, d_model, d_model, dropout, alpha)
-
-    def forward(self, x, bias):
-        attn_in = self.layer_norm_1(x)
-        attn = self.attn(attn_in, bias)
-
-        attn = self.dropout_1(attn) + x
-
-        attn_in = self.layer_norm_2(attn)
-        attn_out = self.out_attn(attn_in, bias)
-        attn_out = self.dropout_2(attn_out) + attn
-
-        return attn_out
