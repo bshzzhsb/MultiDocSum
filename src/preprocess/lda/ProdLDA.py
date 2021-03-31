@@ -30,11 +30,10 @@ class ProdLDA(nn.Module):
         self.register_buffer('prior_var', prior_var)
         self.register_buffer('prior_log_var', prior_log_var)
 
-        if init_mult != 0:
-            self.decoder.weight.data.uniform_(0, init_mult)
-
         if checkpoint is not None:
             self.load_state_dict(checkpoint['model'], strict=True)
+        elif init_mult != 0:
+            self.decoder.weight.data.uniform_(0, init_mult)
 
         self.to(device)
 
@@ -55,8 +54,13 @@ class ProdLDA(nn.Module):
         posterior_var = posterior_log_var.exp()
         # [batch_size, num_topic]
         eps = enc_input.clone().resize_as_(posterior_mean).normal_().requires_grad_(True)
+
         # [batch_size, num_topic]
-        z = posterior_mean + posterior_var.sqrt() * eps
+        if self.training:
+            z = posterior_mean + posterior_var.sqrt() * eps
+        else:
+            z = posterior_mean
+
         p = F.softmax(z, dim=-1)
         p = self.p_drop(p)
 

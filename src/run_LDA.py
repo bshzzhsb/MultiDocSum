@@ -135,15 +135,16 @@ def predict(spm):
         vocab = pickle.load(file)
         args.vocab_size = len(vocab)
 
-    topic_model = TopicModel(args, vocab, args.device, args.checkpoint)
+    topic_model = TopicModel(vocab, args.device, args.checkpoint)
     emb = topic_model.model.decoder.weight.detach().numpy().T
     topic_words, topic_words_probs = get_topic_words(emb, vocab, 10)
 
-    with open(args.data_path + '/train/MultiNews.30.train.11.json') as file:
+    with open(args.data_path + '/test/MultiNews.30.test.1.json') as file:
         dataset = json.load(file)
-        with open('../results/prodlda/topics.txt', 'w', encoding='utf-8') as out:
+        with open('../results/prodlda/topics1.txt', 'w', encoding='utf-8') as out:
             for data in dataset:
-                srcs = [[spm.DecodeIds(src)] for src in data['src']]
+                srcs = [[data['tgt_str']]]
+                # srcs = [[spm.DecodeIds(src)] for src in data['src']]
                 for src in srcs:
                     top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
                         topic_model.get_topic(src, num_top_topic=5, num_top_word=10)
@@ -158,7 +159,7 @@ def preprocess(spm):
         vocab = pickle.load(file)
         args.vocab_size = len(vocab)
 
-    topic_model = TopicModel(args, vocab, args.device, args.checkpoint)
+    topic_model = TopicModel(vocab, args.device, args.checkpoint)
 
     phases = ['train', 'test', 'dev']
 
@@ -244,8 +245,8 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=2e-3, type=float)
     parser.add_argument('--lr_scheduler', default='', type=str)
     parser.add_argument('--max_grad_norm', default=2.0, type=float)
-    parser.add_argument('--beta1', default=0.99, type=float)
-    parser.add_argument('--beta2', default=0.999, type=float)
+    parser.add_argument('--beta1', default=0.9, type=float)
+    parser.add_argument('--beta2', default=0.998, type=float)
     parser.add_argument('--epochs', default=80, type=int)
     parser.add_argument('--init_mult', default=1.0, type=float)
     parser.add_argument('--variance', default=0.995, type=float)
