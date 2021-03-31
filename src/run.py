@@ -10,6 +10,7 @@ from graph_sum.model import GraphSum
 from models.model_builder import MultiDocSum, init_params
 from model_topic_q.model_builder import MDSTopicQ
 from model_topic_kv.model_builder import MDSTopicKV
+from model_topic_kvs.model_builder import MDSTopicKVS
 from model_gat.model_builder import MDSGAT
 from modules.optimizer import build_optim
 from models.trainer_builder import build_trainer
@@ -36,6 +37,39 @@ def main():
         test(device)
 
 
+def get_model(symbols, spm, device, checkpoint):
+    if args.model == 'GraphSum':
+        model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
+    elif args.model == 'MultiDocSum':
+        model = MultiDocSum(args, symbols, spm, device, checkpoint)
+    elif args.model == 'MDSTopicQ':
+        logger.warning('MDSTopicQ is deprecated!!!')
+        model = MDSTopicQ(args, symbols, spm, device, checkpoint)
+    elif args.model == 'MDSTopicKV':
+        model = MDSTopicKV(args, symbols, spm, device, checkpoint)
+    elif args.model == 'MDSTopicKVS':
+        model = MDSTopicKVS(args, symbols, spm, device, checkpoint)
+    elif args.model == 'MDSGAT':
+        model = MDSGAT(args, symbols, spm, device, checkpoint)
+    else:
+        raise NotImplementedError()
+
+    return model
+
+
+def get_spm():
+    spm = sentencepiece.SentencePieceProcessor()
+    spm.Load(args.vocab_path)
+    # <UNK>: 0, <T>: 3, <S>: 4, </S>: 5, <PAD>: 6, <P>: 7, <Q>: 8
+    symbols = {'BOS': spm.PieceToId('<S>'), 'EOS': spm.PieceToId('</S>'),
+               'PAD': spm.PieceToId('<PAD>'), 'EOT': spm.PieceToId('<T>'),
+               'EOP': spm.PieceToId('<P>'), 'EOQ': spm.PieceToId('<Q>'),
+               'UNK': spm.PieceToId('<UNK>')}
+    logger.info(symbols)
+
+    return spm, symbols
+
+
 def train(device):
     logger.info(args)
     torch.manual_seed(args.random_seed)
@@ -48,14 +82,7 @@ def train(device):
     else:
         checkpoint = None
 
-    spm = sentencepiece.SentencePieceProcessor()
-    spm.Load(args.vocab_path)
-    # <UNK>: 0, <T>: 3, <S>: 4, </S>: 5, <PAD>: 6, <P>: 7, <Q>: 8
-    symbols = {'BOS': spm.PieceToId('<S>'), 'EOS': spm.PieceToId('</S>'),
-               'PAD': spm.PieceToId('<PAD>'), 'EOT': spm.PieceToId('<T>'),
-               'EOP': spm.PieceToId('<P>'), 'EOQ': spm.PieceToId('<Q>'),
-               'UNK': spm.PieceToId('<UNK>')}
-    logger.info(symbols)
+    spm, symbols = get_spm()
     vocab_size = len(spm)
 
     def train_iter_fct():
@@ -66,19 +93,7 @@ def train(device):
         return DataLoader(args, load_dataset(args, 'test', shuffle=False), symbols,
                           args.batch_size, device, shuffle=False, is_test=True)
 
-    if args.model == 'GraphSum':
-        model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
-    elif args.model == 'MultiDocSum':
-        model = MultiDocSum(args, symbols, spm, device, checkpoint)
-    elif args.model == 'MDSTopicQ':
-        logger.warning('MDSTopicQ is deprecated!!!')
-        model = MDSTopicQ(args, symbols, spm, device, checkpoint)
-    elif args.model == 'MDSTopicKV':
-        model = MDSTopicKV(args, symbols, spm, device, checkpoint)
-    elif args.model == 'MDSGAT':
-        model = MDSGAT(args, symbols, spm, device, checkpoint)
-    else:
-        raise NotImplementedError()
+    model = get_model(symbols, spm, device, checkpoint)
 
     # init = partial(init_params, args.initializer_range)
     # model.apply(init)
@@ -101,26 +116,9 @@ def test(device):
     logger.info('Loading checkpoint from %s' % args.checkpoint)
     checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
 
-    spm = sentencepiece.SentencePieceProcessor()
-    spm.Load(args.vocab_path)
-    symbols = {'BOS': spm.PieceToId('<S>'), 'EOS': spm.PieceToId('</S>'),
-               'PAD': spm.PieceToId('<PAD>'), 'EOT': spm.PieceToId('<T>'),
-               'EOP': spm.PieceToId('<P>'), 'EOQ': spm.PieceToId('<Q>'),
-               'UNK': spm.PieceToId('<UNK>')}
+    spm, symbols = get_spm()
 
-    if args.model == 'GraphSum':
-        model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
-    elif args.model == 'MultiDocSum':
-        model = MultiDocSum(args, symbols, spm, device, checkpoint)
-    elif args.model == 'MDSTopicQ':
-        logger.warning('MDSTopicQ is deprecated!!!')
-        model = MDSTopicQ(args, symbols, spm, device, checkpoint)
-    elif args.model == 'MDSTopicKV':
-        model = MDSTopicKV(args, symbols, spm, device, checkpoint)
-    elif args.model == 'MDSGAT':
-        model = MDSGAT(args, symbols, spm, device, checkpoint)
-    else:
-        raise NotImplementedError()
+    model = get_model(symbols, spm, device, checkpoint)
     model.eval()
 
     test_iter = DataLoader(args, load_dataset(args, 'test', shuffle=False), symbols,
@@ -160,7 +158,7 @@ if __name__ == '__main__':
 
     # model-related arguments
     parser.add_argument('--model', default='MultiDocSum', type=str, help='The model to use',
-                        choices=['GraphSum', 'MultiDocSum', 'MDSTopicQ', 'MDSTopicKV', 'MDSGAT'])
+                        choices=['GraphSum', 'MultiDocSum', 'MDSTopicQ', 'MDSTopicKV', 'MDSTopicKVS', 'MDSGAT'])
     parser.add_argument('--max_grad_norm', default=2.0, type=float, help='The max gradient norm')
     parser.add_argument('--initializer_range', default=0.02, type=int,
                         help='The standard deviation (std) of model normal initializer')
