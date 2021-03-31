@@ -9,10 +9,11 @@ def build_optim(args, model, checkpoint):
         weight_decay=args.weight_decay,
         eps=args.eps,
         beta1=args.beta1, beta2=args.beta2,
+        model_size=args.hidden_size,
         lr_scheduler=args.lr_scheduler,
         train_steps=args.train_steps,
-        warmup_steps=args.warmup_prop * args.train_steps,
-        model_size=args.hidden_size
+        warmup_steps=args.warmup_steps,
+        warmup_prop=args.warmup_prop
     )
 
     optimizer.set_parameters(list(model.named_parameters()))
@@ -34,8 +35,9 @@ def build_optim(args, model, checkpoint):
 
 class Optimizer(object):
 
-    def __init__(self, method='adam', learning_rate=3, max_grad_norm=2.0, weight_decay=0.01, eps=1e-9,
-                 beta1=0.9, beta2=0.999, lr_scheduler=None, train_steps=None, warmup_steps=None, model_size=None):
+    def __init__(self, method='adam', learning_rate=3, max_grad_norm=2.0, weight_decay=0.01,
+                 eps=1e-9, beta1=0.9, beta2=0.999, model_size=None, lr_scheduler=None,
+                 train_steps=None, warmup_steps=8000, warmup_prop=None):
         self.method = method
         self.learning_rate = learning_rate
         self.original_lr = learning_rate
@@ -46,6 +48,8 @@ class Optimizer(object):
         self.betas = (beta1, beta2)
         self.lr_scheduler = lr_scheduler
         self.warmup_steps = warmup_steps
+        if self.lr_scheduler == 'linear_warmup_decay':
+            self.warmup_steps *= warmup_prop
         self.model_size = model_size
         self.train_steps = train_steps
 
