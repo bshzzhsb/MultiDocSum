@@ -6,10 +6,12 @@ from torch.nn.utils import clip_grad_norm_
 def build_optim(args, model, checkpoint):
     optimizer = Optimizer(
         args.optimizer, args.lr, args.max_grad_norm,
+        weight_decay=args.weight_decay,
+        eps=args.eps,
         beta1=args.beta1, beta2=args.beta2,
         lr_scheduler=args.lr_scheduler,
-        warmup_steps=args.warmup_steps,
         train_steps=args.train_steps,
+        warmup_steps=args.warmup_prop * args.train_steps,
         model_size=args.hidden_size
     )
 
@@ -32,20 +34,16 @@ def build_optim(args, model, checkpoint):
 
 class Optimizer(object):
 
-    def __init__(self, method='adam', learning_rate=3, max_grad_norm=0,
-                 start_decay_steps=None, decay_steps=None, train_steps=None,
-                 lr_decay=1, beta1=0.9, beta2=0.999, adagrad_accum=0.0,
-                 lr_scheduler=None, warmup_steps=4000, model_size=None):
+    def __init__(self, method='adam', learning_rate=3, max_grad_norm=2.0, weight_decay=0.01, eps=1e-9,
+                 beta1=0.9, beta2=0.999, lr_scheduler=None, train_steps=None, warmup_steps=None, model_size=None):
         self.method = method
         self.learning_rate = learning_rate
         self.original_lr = learning_rate
         self.max_grad_norm = max_grad_norm
-        self.lr_decay = lr_decay
-        self.start_decay_steps = start_decay_steps
-        self.decay_steps = decay_steps
+        self.weight_decay = weight_decay
+        self.eps = eps
         self._step = 0
         self.betas = (beta1, beta2)
-        self.adagrad_accum = adagrad_accum
         self.lr_scheduler = lr_scheduler
         self.warmup_steps = warmup_steps
         self.model_size = model_size
@@ -63,7 +61,8 @@ class Optimizer(object):
         for k, p in params:
             if p.requires_grad:
                 self.params.append(p)
-        self.optimizer = optim.Adam(self.params, lr=self.learning_rate, betas=self.betas, eps=1e-9)
+        self.optimizer = optim.Adam(self.params, lr=self.learning_rate, betas=self.betas,
+                                    weight_decay=self.weight_decay, eps=self.eps)
 
     def _set_rate(self, learning_rate):
         self.learning_rate = learning_rate
@@ -82,13 +81,7 @@ class Optimizer(object):
             else:
                 self._set_rate(
                     self.original_lr *
-                    (1 - (self._step - self.warmup_steps) / self.train_steps))
-        else:
-            if self.start_decay_steps is not None and self._step > self.start_decay_steps:
-                self.start_decay = True
-            if self.start_decay:
-                if (self._step - self.start_decay_steps) % self.decay_steps == 0:
-                    self._set_rate(self.learning_rate * self.lr_decay)
+                    (1 - self._step / self.train_steps))
 
         if self.max_grad_norm:
             clip_grad_norm_(self.params, self.max_grad_norm)

@@ -159,7 +159,6 @@ if __name__ == '__main__':
     # model-related arguments
     parser.add_argument('--model', default='MultiDocSum', type=str, help='The model to use',
                         choices=['GraphSum', 'MultiDocSum', 'MDSTopicQ', 'MDSTopicKV', 'MDSTopicKVS', 'MDSGAT'])
-    parser.add_argument('--max_grad_norm', default=2.0, type=float, help='The max gradient norm')
     parser.add_argument('--initializer_range', default=0.02, type=int,
                         help='The standard deviation (std) of model normal initializer')
     parser.add_argument('--weight_sharing', default=True, type=str2bool,
@@ -183,16 +182,21 @@ if __name__ == '__main__':
 
     # optimizer-related arguments
     parser.add_argument('--optimizer', default='adam', type=str, help='The optimizer used in training')
-    parser.add_argument('--lr', default=2, type=float, help='Learning rate of the model in training')
-    parser.add_argument('--lr_scheduler', default='noam', type=str, help='The decay method of learning rate')
+    parser.add_argument('--lr', default=3, type=float, help='Learning rate of the model in training')
+    parser.add_argument('--lr_scheduler', default='noam', type=str, choices=['linear_warmup_decay', 'noam'],
+                        help='The decay method of learning rate')
     parser.add_argument('--beta1', default=0.9, type=float, help='Param for Adam optimizer')
     parser.add_argument('--beta2', default=0.998, type=float, help='Param for Adam optimizer')
-    parser.add_argument('--warmup_steps', default=4000, type=int,
+    parser.add_argument('--weight_decay', default=0.01, type=float)
+    parser.add_argument('--warmup_prop', default=0.1, type=float,
+                        help='Proportion of training steps to perform linear learning rate warmup')
+    parser.add_argument('--warmup_steps', default=8000, type=int,
                         help='The training steps to perform linear learning rate warmup')
-
+    parser.add_argument('--eps', default=1e-9, type=float, help='eps for adam optimizer')
     parser.add_argument('--max_generator_batches', default=32, type=int,
                         help='shard size in compute loss when training')
     parser.add_argument('--label_smoothing', default=0.1, type=float, help='Label smoothing in loss compute')
+    parser.add_argument('--max_grad_norm', default=2.0, type=float, help='The max gradient norm')
 
     # for decode
     parser.add_argument('--beam_size', default=5, type=int, help='Beam search')
