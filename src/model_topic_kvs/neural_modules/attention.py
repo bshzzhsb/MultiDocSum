@@ -113,7 +113,7 @@ class MultiHeadHierarchicalAttention(nn.Module):
         # [batch_size, len_q, d_model]
         context_w, _ = self.attn_with_sent_norm(q_w, k_w, v_w, attn_s, bias_w)
 
-        # [batch_size, len_q, d_model * 2]
+        # [batch_size, len_q, d_model * 3]
         out = torch.cat([context_t, context_s, context_w], dim=2)
         # [batch_size, len_q, d_model]
         out = self.fc(out)

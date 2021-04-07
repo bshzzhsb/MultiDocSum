@@ -6,7 +6,7 @@ from torch.nn.utils import clip_grad_norm_
 
 def build_optim(args, model: nn.Module, checkpoint):
     optimizer = Optimizer(
-        args.optimizer, args.lr, args.max_grad_norm,
+        method=args.optimizer, learning_rate=args.lr, max_grad_norm=args.max_grad_norm,
         weight_decay=args.weight_decay,
         eps=args.eps,
         beta1=args.beta1, beta2=args.beta2,
@@ -87,11 +87,13 @@ class Optimizer(object):
             self.optimizer = optim.Adam(groups, lr=self.learning_rate, betas=self.betas, eps=self.eps)
         elif self.method.lower() == 'adamw':
             self.optimizer = optim.AdamW(groups, lr=self.learning_rate, betas=self.betas, eps=self.eps)
+        else:
+            raise NotImplementedError('Optimizer not implemented, please choose adam or adamw')
 
     def _set_rate(self, learning_rate):
         self.learning_rate = learning_rate
-        for i in range(len(self.params)):
-            self.optimizer.param_groups[i]['lr'] = self.learning_rate
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = self.learning_rate
 
     def step(self):
         self._step += 1
@@ -108,7 +110,7 @@ class Optimizer(object):
                     self.original_lr *
                     (1 - self._step / self.train_steps))
 
-        if self.max_grad_norm:
+        if self.max_grad_norm > 0.0:
             for i in range(len(self.params)):
                 clip_grad_norm_(self.params[i], self.max_grad_norm)
         self.optimizer.step()
