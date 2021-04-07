@@ -56,7 +56,7 @@ class MDSTopicKVS(nn.Module):
         self.enc_pos_embed = PositionalEncoding(self.embed_size // 2)
         self.dec_pos_embed = PositionalEncoding(self.embed_size)
 
-        self.topic_embed = nn.Embedding(self.vocab_size, self.embed_size)
+        self.topic_embed = nn.Embedding(self.vocab_size, self.embed_size, self.padding_idx)
 
         if self.weight_sharing:
             self.dec_embed.weight = self.enc_word_embed.weight
