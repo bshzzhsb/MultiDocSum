@@ -135,6 +135,7 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
             pos_v = self.fc_pos_v(scaled_q)
             # [batch_size, n_heads, len_q, 1]
             pos_s = self.fc_pos_s(torch.tanh(pos_v))
+            # pos 表示摘要 q 中的每个单词关注的段落，由于段落为整数，所以分为了 pos_up 和 pos_down
             pos = torch.sigmoid(pos_s) * (len_k_s - 1)
 
             # [batch_size, n_heads, len_q, 1]
@@ -163,12 +164,14 @@ class GraphScaledDotProductAttentionWithMask(nn.Module):
             graph_attn_mask = torch.unsqueeze(graph_attn_bias, dim=2)
             graph_attn_mask = graph_attn_mask.expand(-1, -1, len_q, -1, -1)
 
-            # [batch_size, n_heads, len_q, len_k_s]
             pos_up_ind = pos_up_ind.permute(3, 0, 1, 2)
-            graph_attn_mask_up = graph_attn_mask[list(pos_up_ind)]
             pos_down_ind = pos_down_ind.permute(3, 0, 1, 2)
+            # 将 pos_up/pos_down 中对应的中心段落与其他段落的相似度，作为摘要与其他段落的相似度
+            # [batch_size, n_heads, len_q, len_k_s]
+            graph_attn_mask_up = graph_attn_mask[list(pos_up_ind)]
             graph_attn_mask_down = graph_attn_mask[list(pos_down_ind)]
 
+            # 将 pos_up/pos_down 与 pos 的距离作为权重，加权得到最终的 graph_attn_mask
             # [batch_size, n_heads, len_q, len_k_s]
             graph_attn_mask_select = graph_attn_mask_up * (1.0 - (pos_up.to(torch.float32) - pos)) + \
                 graph_attn_mask_down * (1.0 - (pos - pos_down.to(torch.float32)))
