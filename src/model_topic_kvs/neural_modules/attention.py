@@ -27,6 +27,7 @@ class MultiHeadHierarchicalAttention(nn.Module):
         self.w_qs_t = nn.Linear(d_model, n_heads * d_k)
         self.w_ks_t = nn.Linear(d_model, n_heads * d_k)
         self.w_vs_t = nn.Linear(d_model, n_heads * d_v)
+        self.fc_topic = nn.Linear(d_model, d_model)
         self.fc = nn.Linear(d_model * 3, d_model)
 
         self.graph_attn = GraphScaledDotProductAttentionWithMask(dropout, d_model, d_k, d_v, pos_win, self.device)
@@ -84,15 +85,6 @@ class MultiHeadHierarchicalAttention(nn.Module):
         # [batch_size, len_q, d_model] [batch_size, n_heads, len_q, len_k_s]
         context_s, attn_s = self.graph_attn(q_s, k_s, v_s, bias_s, graph_attn_bias)
 
-        # [batch_size, n_topic_words, n_heads * dim_per_head]
-        q_t, k_t, v_t = self.w_qs_t(q), self.w_ks_t(topic), self.w_vs_t(topic)
-        # [batch_size, n_heads, n_topic_words, dim_per_head]
-        q_t, k_t, v_t = shape(q_t), shape(k_t), shape(v_t)
-        # [batch_size, n_heads, len_q, dim_per_head]
-        context_t = self.topic_attn(q_t, k_t, v_t, topic_attn_bias)
-        # [batch_size, len_q, d_model]
-        context_t = unshape(context_t)
-
         q_w = self.w_qs_w(q)
         # [batch_size, n_heads, len_q, d_k]
         q_w = shape(q_w)
@@ -112,6 +104,27 @@ class MultiHeadHierarchicalAttention(nn.Module):
 
         # [batch_size, len_q, d_model]
         context_w, _ = self.attn_with_sent_norm(q_w, k_w, v_w, attn_s, bias_w)
+
+        q_t = self.w_qs_t(q)
+        q_t = shape(q_t)
+        if cache is not None:
+            if cache['memory_k_topic'] is not None:
+                k_t, v_t = cache['memory_k_topic'], cache['memory_v_topic']
+            else:
+                k_t, v_t = self.w_ks_t(topic), self.w_vs_t(topic)
+                k_t, v_t = shape(k_t), shape(v_t)
+                cache['memory_k_topic'], cache['memory_v_topic'] = k_t, v_t
+        else:
+            # [batch_size, n_topic_words, n_heads * dim_per_head]
+            k_t, v_t = self.w_ks_t(topic), self.w_vs_t(topic)
+            # [batch_size, n_heads, n_topic_words, dim_per_head]
+            k_t, v_t = shape(k_t), shape(v_t)
+        # [batch_size, n_heads, len_q, dim_per_head]
+        context_t = self.topic_attn(q_t, k_t, v_t, topic_attn_bias)
+
+        # [batch_size, len_q, d_model]
+        context_t = unshape(context_t)
+        context_t = self.fc_topic(context_t)
 
         # [batch_size, len_q, d_model * 3]
         out = torch.cat([context_t, context_s, context_w], dim=2)

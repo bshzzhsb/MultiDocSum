@@ -183,7 +183,7 @@ if __name__ == '__main__':
     parser.add_argument('--dropout_prob', default=0.1, type=float, help='Dropout probability')
 
     # optimizer-related arguments
-    parser.add_argument('--optimizer', default='adam', type=str, choices=['adam', 'adamw'],
+    parser.add_argument('--optimizer', default='adamw', type=str, choices=['adam', 'adamw'],
                         help='The optimizer used in training')
     parser.add_argument('--lr', default=3, type=float, help='Learning rate of the model in training')
     parser.add_argument('--lr_scheduler', default='noam', type=str, choices=['linear_warmup_decay', 'noam'],

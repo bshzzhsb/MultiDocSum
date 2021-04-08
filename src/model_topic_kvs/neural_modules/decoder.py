@@ -107,7 +107,9 @@ class GraphDecoderState(object):
                 'static_k_sent': None,
                 'static_v_sent': None,
                 'static_k_word': None,
-                'static_v_word': None
+                'static_v_word': None,
+                'memory_k_topic': None,
+                'memory_v_topic': None
             }
             self.cache['layer_{}'.format(layer)] = layer_cache
 
