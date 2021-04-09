@@ -39,7 +39,7 @@ def get_num_example():
 def optimizer_builder(model):
     if args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(
-            model.parameters(), args.learning_rate, betas=(args.beta1, args.beta2)
+            model.parameters(), args.lr, betas=(args.beta1, args.beta2)
         )
         return optimizer
 
@@ -75,7 +75,7 @@ def train(spm):
 
     model = model_builder()
     args.warmup_steps = None
-    optimizer = build_optim(args, model, checkpoint=None)
+    optimizer = optimizer_builder(model)
     tensorboard_dir = args.model_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
     writer = SummaryWriter(tensorboard_dir)
 
@@ -94,38 +94,19 @@ def train(spm):
             loss_epoch += loss.item()
             if step % args.report_every == 0 and step > 0:
                 writer.add_scalar('train/loss', loss, step)
-                logger.info('Step {}, loss {}, lr: {}'.format(step, loss, optimizer.learning_rate))
+                logger.info('Step {}, loss {}, lr: {}'.format(step, loss, optimizer.param_groups[0]['lr']))
             step += 1
         logger.info('Epoch {}, average epoch loss {}'.format(step // epoch_steps, loss_epoch / epoch_steps))
 
     checkpoint = {
         'model': model.state_dict(),
         'opt': args,
-        'optim': optimizer.optimizer.state_dict(),
+        'optim': optimizer.state_dict(),
         'num_topics': args.num_topics
     }
     checkpoint_path = os.path.join(model_save_file)
     logger.info('Saving checkpoint %s' % checkpoint_path)
     torch.save(checkpoint, checkpoint_path)
-
-
-def test():
-    assert args.checkpoint is not None
-
-    logger.info('Loading checkpoint from %s' % args.checkpoint)
-    checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
-    args.num_topics = checkpoint['num_topics']
-
-    with open(args.vocab_file, 'rb') as file:
-        vocab = pickle.load(file)
-        file.close()
-    args.vocab_size = len(vocab)
-
-    model = model_builder(checkpoint)
-    model.eval()
-
-    emb = model.decoder.weight.detach().numpy().T
-    get_topic_words(emb, vocab)
 
 
 def predict(spm):
@@ -210,8 +191,6 @@ def main():
 
     if args.mode == 'train':
         train(spm)
-    elif args.mode == 'test':
-        test()
     elif args.mode == 'predict':
         predict(spm)
     elif args.mode == 'preprocess':
@@ -239,7 +218,7 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_size', default=256, type=int)
     parser.add_argument('--enc1_units', default=256, type=int)
     parser.add_argument('--enc2_units', default=256, type=int)
-    parser.add_argument('--num_topics', default=50, type=int)
+    parser.add_argument('--num_topics', default=100, type=int)
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--optimizer', default='Adam', type=str)
     parser.add_argument('--lr', default=2e-3, type=float)
