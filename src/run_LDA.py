@@ -14,7 +14,6 @@ from tensorboardX import SummaryWriter
 from preprocess.lda import ProdLDA, TopicModel
 from preprocess.utils import data_loader, load_stop_words, build_count_vectorizer, get_count_vectorizer
 from utils.logger import init_logger, logger
-from modules.optimizer import build_optim
 
 
 def int_float(v):
@@ -115,6 +114,63 @@ def train(spm):
     torch.save(checkpoint, checkpoint_path)
 
 
+def train_src(spm):
+    model_save_file = args.model_path + '/prodlda_model.pt'
+
+    dataset = data_loader(args.data_path, source=args.source, spm=spm)
+    with open(args.vocab_file, 'rb') as file:
+        vocab = pickle.load(file)
+        args.vocab_size = len(vocab)
+    logger.info('Loaded vocab {}, vocab size {}'.format(args.vocab_file, len(vocab)))
+    vectorizer = get_count_vectorizer(vocab)
+
+    dataset = np.array(dataset)
+    len_dataset = dataset.shape[0]
+    all_indices = list(range(len_dataset))
+    np.random.shuffle(all_indices)
+    batch_size, device, epochs = args.batch_size, args.device, args.epochs
+
+    epoch_steps = math.ceil(len_dataset / batch_size)
+    args.train_steps = args.epochs * epoch_steps
+    logger.info('num steps: {}'.format(args.train_steps))
+
+    model = model_builder()
+    args.warmup_steps = None
+    optimizer = optimizer_builder(model)
+    tensorboard_dir = args.model_path + '/tensorboard' + datetime.now().strftime('/%b-%d_%H-%M-%S')
+    writer = SummaryWriter(tensorboard_dir)
+
+    model.train()
+    step = 0
+    for _ in range(epochs):
+        loss_epoch = 0.0
+        for i in range(0, len_dataset, batch_size):
+            batch_indices = all_indices[i: i+batch_size]
+            batch = vectorizer.transform(dataset[batch_indices]).toarray()
+            batch = torch.tensor(batch, dtype=torch.float32, device=device)
+            model.zero_grad()
+            recon, loss = model(batch)
+            loss.backward()
+            optimizer.step()
+            gc.collect()
+            loss_epoch += loss.item()
+            if step % args.report_every == 0 and step > 0:
+                writer.add_scalar('train/loss', loss, step)
+                logger.info('Step {}, loss {}, lr: {}'.format(step, loss, optimizer.param_groups[0]['lr']))
+            step += 1
+        logger.info('Epoch {}, average epoch loss {}'.format(step // epoch_steps, loss_epoch / epoch_steps))
+
+    checkpoint = {
+        'model': model.state_dict(),
+        'opt': args,
+        'optim': optimizer.state_dict(),
+        'num_topics': args.num_topics
+    }
+    checkpoint_path = os.path.join(model_save_file)
+    logger.info('Saving checkpoint %s' % checkpoint_path)
+    torch.save(checkpoint, checkpoint_path)
+
+
 def predict(spm):
     assert args.checkpoint is not None
 
@@ -159,14 +215,25 @@ def preprocess(spm):
                 data = json.load(pt_file)
                 pt_name = pt_file.name.split('/')[-1]
             with open(args.out_path + '/' + phase + '/' + pt_name, 'w', encoding='utf-8') as out_file:
-                for i, item in enumerate(data):
-                    tgt = [item['tgt_str']]
-                    top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
-                        topic_model.get_topic(tgt, num_top_topic=5, num_top_word=10)
-                    top_n_words = [vocab[idx] for idx in top_n_words]
-                    top_n_words_ids = [idx[0] for idx in spm.Encode(top_n_words)]
-                    data[i]['tgt_topic'] = [(word_id, prob)
-                                            for (word_id, prob) in zip(top_n_words_ids, top_n_words_probs.tolist())]
+                if args.source == 'tgt':
+                    for i, item in enumerate(data):
+                        tgt = [item['tgt_str']]
+                        top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
+                            topic_model.get_topic(tgt, num_top_topic=5, num_top_word=10)
+                        top_n_words = [vocab[idx] for idx in top_n_words]
+                        top_n_words_ids = [idx[0] for idx in spm.Encode(top_n_words)]
+                        data[i]['tgt_topic'] = [(word_id, prob)
+                                                for (word_id, prob) in zip(top_n_words_ids, top_n_words_probs.tolist())]
+                else:
+                    for i, item in enumerate(data):
+                        data[i]['src_topic'] = []
+                        for j, src in enumerate(item['src']):
+                            src = [spm.DecodeIds(src)]
+                            _, _, top_n_words, top_n_words_probs = \
+                                topic_model.get_topic(src, num_top_topic=5, num_top_word=1)
+                            top_n_words = [vocab[idx] for idx in top_n_words]
+                            top_n_words_ids = [idx[0] for idx in spm.Encode(top_n_words)]
+                            data[i]['src_topic'].append(top_n_words_ids[0])
                 json.dump(data, out_file)
 
 
@@ -196,7 +263,10 @@ def main():
     args.device = 'cuda' if args.use_cuda else 'cpu'
 
     if args.mode == 'train':
-        train(spm)
+        if args.source == 'tgt':
+            train(spm)
+        elif args.source == 'src':
+            train_src(spm)
     elif args.mode == 'predict':
         predict(spm)
     elif args.mode == 'preprocess':

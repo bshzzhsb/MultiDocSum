@@ -54,10 +54,9 @@ def build_count_vectorizer(dataset, stop_words, max_df, min_df):
     return dataset, vocab
 
 
-def get_count_vectorizer(dataset, vocab):
+def get_count_vectorizer(vocab):
     vectorizer = CountVectorizer(vocabulary=vocab)
-    dataset = vectorizer.transform(dataset).toarray()
-    return dataset
+    return vectorizer
 
 
 def get_nearest_neighbors(word, embeddings, vocab):
