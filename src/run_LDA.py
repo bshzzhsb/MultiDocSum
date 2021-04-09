@@ -124,10 +124,7 @@ def train_src(spm):
     logger.info('Loaded vocab {}, vocab size {}'.format(args.vocab_file, len(vocab)))
     vectorizer = get_count_vectorizer(vocab)
 
-    dataset = np.array(dataset)
-    len_dataset = dataset.shape[0]
-    all_indices = list(range(len_dataset))
-    np.random.shuffle(all_indices)
+    len_dataset = len(dataset)
     batch_size, device, epochs = args.batch_size, args.device, args.epochs
 
     epoch_steps = math.ceil(len_dataset / batch_size)
@@ -144,9 +141,9 @@ def train_src(spm):
     step = 0
     for _ in range(epochs):
         loss_epoch = 0.0
+        np.random.shuffle(dataset)
         for i in range(0, len_dataset, batch_size):
-            batch_indices = all_indices[i: i+batch_size]
-            batch = vectorizer.transform(dataset[batch_indices]).toarray()
+            batch = vectorizer.transform(dataset[i: i + batch_size]).toarray()
             batch = torch.tensor(batch, dtype=torch.float32, device=device)
             model.zero_grad()
             recon, loss = model(batch)
@@ -186,8 +183,8 @@ def predict(spm):
         dataset = json.load(file)
         with open('../results/prodlda/topics1.txt', 'w', encoding='utf-8') as out:
             for data in dataset:
-                srcs = [[data['tgt_str']]]
-                # srcs = [[spm.DecodeIds(src)] for src in data['src']]
+                # srcs = [[data['tgt_str']]]
+                srcs = [[spm.DecodeIds(src)] for src in data['src']]
                 for src in srcs:
                     top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
                         topic_model.get_topic(src, num_top_topic=5, num_top_word=10)
