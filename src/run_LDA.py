@@ -12,7 +12,7 @@ from datetime import datetime
 from tensorboardX import SummaryWriter
 
 from preprocess.lda import ProdLDA, TopicModel
-from preprocess.utils import data_loader, load_stop_words, build_count_vectorizer
+from preprocess.utils import data_loader, load_stop_words, build_count_vectorizer, get_count_vectorizer
 from utils.logger import init_logger, logger
 from modules.optimizer import build_optim
 
@@ -57,13 +57,19 @@ def train(spm):
     stop_words = load_stop_words(args.stop_words_file)
     # stop_words = 'english'
     dataset = data_loader(args.data_path, source=args.source, spm=spm)
-    dataset, vocab = build_count_vectorizer(dataset, stop_words, args.max_df, args.min_df)
+    if args.source == 'tgt':
+        dataset, vocab = build_count_vectorizer(dataset, stop_words, args.max_df, args.min_df)
+        logger.info('Saving vocab to {}, vocab size {}'.format(vocab_save_file, len(vocab)))
+        with open(vocab_save_file, 'wb') as file:
+            pickle.dump(vocab, file)
+            args.vocab_size = len(vocab)
+    else:
+        with open(args.vocab_file, 'rb') as file:
+            vocab = pickle.load(file)
+            args.vocab_size = len(vocab)
+        logger.info('Loaded vocab {}, vocab size {}'.format(args.vocab_file, len(vocab)))
+        dataset = get_count_vectorizer(dataset, vocab)
 
-    logger.info('Saving vocab to {}, vocab size {}'.format(vocab_save_file, len(vocab)))
-    with open(vocab_save_file, 'wb') as file:
-        pickle.dump(vocab, file)
-
-    args.vocab_size = len(vocab)
     len_dataset = dataset.shape[0]
     all_indices = list(range(len_dataset))
     np.random.shuffle(all_indices)
@@ -204,7 +210,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', default='../models', type=str)
     parser.add_argument('--checkpoint', default=None, type=str)
     parser.add_argument('--spm_file', default='../vocab/spm9998_3.model', type=str)
-    parser.add_argument('--vocab_file', default='../results/prod_lda/vocab.pt', type=str)
+    parser.add_argument('--vocab_file', default='../results/prod_lda/vocab.pkl', type=str)
     parser.add_argument('--stop_words_file', default='../files/stop_words.txt', type=str)
     parser.add_argument('--out_path', default='../../data/MultiNewsTopic', type=str)
 
