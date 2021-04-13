@@ -295,7 +295,7 @@ class Translator(object):
         def _sub_token_id2full_tokens(sub_token_indices):
             full_tokens = []
             pre_is_space = False
-            for sub_token_id in sub_token_indices.numpy().tolist():
+            for sub_token_id in sub_token_indices.cpu().numpy().tolist():
                 is_full_token = self.id2is_full_token[sub_token_id]
                 if sub_token_id == self.space_idx:
                     pre_is_space = True
