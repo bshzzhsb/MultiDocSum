@@ -30,6 +30,7 @@ class Translator(object):
 
         self.bos_idx = symbols['BOS']
         self.eos_idx = symbols['EOS']
+        self.space_idx = symbols['SPACE']
 
         self.beam_size = self.args.beam_size
         self.batch_size = self.args.batch_size
@@ -40,6 +41,9 @@ class Translator(object):
 
         self.length_penalty = self.args.length_penalty
         self.blocking_trigram = self.args.block_trigram
+
+        self.id2is_full_token = [self.vocab.IdToPiece(token_id).startswith('▁')
+                                 for token_id in range(len(self.vocab))]
 
     def translate(self, test_iter, step):
         logger.info('Start predicting')
@@ -66,9 +70,9 @@ class Translator(object):
                 for translation in translations:
                     pred, gold, src = translation
                     pred_str = ' '.join(pred).replace('<Q>', ' ').replace(' +', ' ') \
-                                  .replace('<unk>', 'UNK').replace('\\', '').strip()
+                        .replace('<unk>', 'UNK').replace('\\', '').strip()
                     gold_str = ' '.join(gold).replace('<t>', '').replace('</t>', '') \
-                                  .replace('<Q>', ' ').replace(' +', ' ').replace('\\', '').strip()
+                        .replace('<Q>', ' ').replace(' +', ' ').replace('\\', '').strip()
 
                     gold_str = gold_str.lower()
                     raw_candi_file.write(' '.join(pred).strip() + ' \n')
@@ -114,6 +118,7 @@ class Translator(object):
         tgt_src_sents_attn_bias = src_sents_self_attn_bias[:, :, 0].unsqueeze(2)
         tgt_src_sents_attn_bias.requires_grad = False
 
+        # 拿到 encoder 的输出，并展开 beam_size 维度
         enc_words_output, enc_sents_output = self.model.encode(enc_input)
         enc_words_output = tile(enc_words_output, beam_size, 0)
         enc_sents_output = tile(enc_sents_output, beam_size, 0)
@@ -144,50 +149,57 @@ class Translator(object):
         for step in range(self.max_out_len):
             pre_ids = alive_seq[:, -1].view(-1, 1)
             pre_pos = torch.full_like(pre_ids, step, dtype=torch.int64, device=self.device)
+            pre_scores = topk_log_probs
 
             dec_input = (pre_ids, pre_pos, None, pre_src_words_attn_bias,
                          pre_src_sents_attn_bias, pre_graph_attn_bias, tgt_topic, tgt_topic_attn_bias)
 
+            # [batch_size * beam_size, vocab_size]
             logits = self.model.decode(dec_input, enc_words_output, enc_sents_output, dec_state)
             vocab_size = logits.size(-1)
 
             if step < self.min_out_len:
                 logits[:, self.eos_idx] = -1e20
 
-            logits += topk_log_probs.view(-1).unsqueeze(1)
-
-            length_penalty = ((5.0 + (step + 1)) / 6.0) ** self.length_penalty
-
-            cur_scores = logits / length_penalty
+            # [batch_size * beam_size, beam_size]
+            topk_scores, topk_indices = logits.topk(beam_size, dim=-1)
 
             if self.blocking_trigram:
-                cur_len = alive_seq.size(1)
-                if cur_len > 3:
-                    for i in range(alive_seq.size(0)):
-                        words = list(map(lambda w: self.vocab.IdToPiece(int(w)), alive_seq[i]))
-                        if len(words) <= 3:
-                            continue
-                        trigrams = [(words[i - 1], words[i], words[i + 1]) for i in range(1, len(words) - 1)]
-                        trigram = trigrams[-1]
-                        if trigram in trigrams[:-1]:
-                            cur_scores[i] = -1e20
+                expand_alive_seq = alive_seq.unsqueeze(1).expand(-1, beam_size, -1)
+                # [batch_size * beam_size, beam_size, step + 1]
+                candi_seqs = torch.cat([expand_alive_seq, topk_indices.unsqueeze(-1)], dim=-1)
+                # [batch_size * beam_size, beam_size]
+                mask_block_trigram = self.block_trigram(candi_seqs)
+                # [batch_size * beam_size, beam_size]
+                pre_scores = topk_log_probs.view(-1).unsqueeze(-1) + mask_block_trigram
 
-            cur_scores = cur_scores.reshape(-1, beam_size * vocab_size)
+            topk_scores = topk_scores + pre_scores
+            length_penalty = ((5.0 + (step + 1)) / 6.0) ** self.length_penalty
+            # [batch_size * beam_size, beam_size]
+            cur_scores = topk_scores / length_penalty
+
+            # 将第一维变成 batch_size，来从每个 batch 的所有 beam 中选择最优的 topk 个
+            cur_scores = cur_scores.view(-1, beam_size * beam_size)
             # [batch_size, beam_size]
             topk_scores, topk_ids = cur_scores.topk(beam_size, dim=-1)
 
             topk_log_probs = topk_scores * length_penalty
 
-            topk_beam_index = topk_ids.div(vocab_size).to(torch.int64)
-            topk_ids = topk_ids.fmod(vocab_size)
+            # 在哪个 beam 里面 [batch_size, beam_size]
+            topk_beam_index = topk_ids.div(beam_size).to(torch.int64)
+            # 在该 beam 的第几个
+            topk_ids = topk_ids.fmod(beam_size)
 
+            # 在 batch * beam 中的序号 [batch_size, beam_size]
             batch_index = (topk_beam_index + beam_offset[:topk_beam_index.size(0)].unsqueeze(1))
             select_indices = batch_index.view(-1)
+            # [batch_size * beam_size]
+            topk_ids = topk_indices[select_indices, topk_ids.view(-1)]
 
             alive_seq = torch.cat([alive_seq.index_select(0, select_indices), topk_ids.view(-1, 1)], -1)
 
             # [batch_size, beam_size]
-            is_finished = topk_ids.eq(self.eos_idx)
+            is_finished = topk_ids.view(-1, beam_size).eq(self.eos_idx)
             if step + 1 == self.max_out_len:
                 is_finished.fill_(True)
             # 结束条件：top beam 结束
@@ -220,13 +232,14 @@ class Translator(object):
                 batch_offset = batch_offset.index_select(0, non_finished)
                 alive_seq = predictions.index_select(0, non_finished).view(-1, alive_seq.size(-1))
 
-            select_indices = batch_index.view(-1)
-            enc_words_output = enc_words_output.index_select(0, select_indices)
-            enc_sents_output = enc_sents_output.index_select(0, select_indices)
-            pre_src_words_attn_bias = pre_src_words_attn_bias.index_select(0, select_indices)
-            pre_src_sents_attn_bias = pre_src_sents_attn_bias.index_select(0, select_indices)
-            tgt_topic = tgt_topic.index_select(0, select_indices)
-            tgt_topic_attn_bias = tgt_topic_attn_bias.index_select(0, select_indices)
+                # 有 batch 完成时，将不会再对其预测
+                select_indices = batch_index.view(-1)
+                enc_words_output = enc_words_output.index_select(0, select_indices)
+                enc_sents_output = enc_sents_output.index_select(0, select_indices)
+                pre_src_words_attn_bias = pre_src_words_attn_bias.index_select(0, select_indices)
+                pre_src_sents_attn_bias = pre_src_sents_attn_bias.index_select(0, select_indices)
+                tgt_topic = tgt_topic.index_select(0, select_indices)
+                tgt_topic_attn_bias = tgt_topic_attn_bias.index_select(0, select_indices)
 
             dec_state.map_batch_fn(lambda state, dim: state.index_select(dim, select_indices))
 
@@ -274,3 +287,49 @@ class Translator(object):
         references = open(gold_path, encoding='utf-8')
         result_dict = test_rouge(candidates, references, 1)
         return result_dict
+
+    def block_trigram(self, candi_seq):
+        """
+        :param candi_seq: [batch_size * beam_size, beam_size, len]
+        """
+        def _sub_token_id2full_tokens(sub_token_indices):
+            full_tokens = []
+            pre_is_space = False
+            for sub_token_id in sub_token_indices.numpy().tolist():
+                is_full_token = self.id2is_full_token[sub_token_id]
+                if sub_token_id == self.space_idx:
+                    pre_is_space = True
+                    continue
+                if is_full_token or not full_tokens or pre_is_space:
+                    full_tokens.append([sub_token_id])
+                else:
+                    pre_full_token = full_tokens[-1]
+                    pre_full_token.append(sub_token_id)
+                pre_is_space = False
+
+            full_tokens = ['-'.join(map(str, full_token)) for full_token in full_tokens]
+            return full_tokens
+
+        def _make_trigram_str(trigram_tokens):
+            return '_'.join(trigram_tokens)
+
+        delta_list = []
+        for beam in candi_seq:
+            delta_scores = []
+            for seq in beam:
+                sub_token_ids = seq.view(-1)
+                tokens = _sub_token_id2full_tokens(sub_token_ids)
+                if len(tokens) <= 3:
+                    delta_scores.append(0)
+                    continue
+                trigrams = [_make_trigram_str(tokens[end - 3: end]) for end in range(3, len(tokens))]
+                trigrams_set = set(trigrams)
+                last_trigram = _make_trigram_str(tokens[-3:])
+                if last_trigram in trigrams_set:
+                    # 重复的 trigram
+                    delta_scores.append(-1e20)
+                else:
+                    delta_scores.append(0)
+            delta_list.append(delta_scores)
+        # [batch_size * beam_size, beam_size]
+        return torch.tensor(delta_list, dtype=torch.float, device=self.device)

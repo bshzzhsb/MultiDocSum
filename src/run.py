@@ -11,7 +11,6 @@ from models.model_builder import MultiDocSum, init_params
 from model_topic_q.model_builder import MDSTopicQ
 from model_topic_kv.model_builder import MDSTopicKV
 from model_topic_kvs.model_builder import MDSTopicKVS
-from model_gat.model_builder import MDSGAT
 from modules.optimizer import build_optim
 from models.trainer_builder import build_trainer
 from models.predictor_builder import build_predictor
@@ -40,7 +39,7 @@ def main():
 def get_model(symbols, spm, device, checkpoint):
     if args.model == 'GraphSum':
         model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
-    elif args.model == 'MultiDocSum':
+    elif args.model == 'MDS':
         model = MultiDocSum(args, symbols, spm, device, checkpoint)
     elif args.model == 'MDSTopicQ':
         logger.warning('MDSTopicQ is deprecated!!!')
@@ -49,8 +48,6 @@ def get_model(symbols, spm, device, checkpoint):
         model = MDSTopicKV(args, symbols, spm, device, checkpoint)
     elif args.model == 'MDSTopicKVS':
         model = MDSTopicKVS(args, symbols, spm, device, checkpoint)
-    elif args.model == 'MDSGAT':
-        model = MDSGAT(args, symbols, spm, device, checkpoint)
     else:
         raise NotImplementedError()
 
@@ -64,7 +61,7 @@ def get_spm():
     symbols = {'BOS': spm.PieceToId('<S>'), 'EOS': spm.PieceToId('</S>'),
                'PAD': spm.PieceToId('<PAD>'), 'EOT': spm.PieceToId('<T>'),
                'EOP': spm.PieceToId('<P>'), 'EOQ': spm.PieceToId('<Q>'),
-               'UNK': spm.PieceToId('<UNK>')}
+               'UNK': spm.PieceToId('<UNK>'), 'SPACE': spm.PieceToId('-')}
     logger.info(symbols)
 
     return spm, symbols
@@ -160,7 +157,7 @@ if __name__ == '__main__':
 
     # model-related arguments
     parser.add_argument('--model', default='MultiDocSum', type=str, help='The model to use',
-                        choices=['GraphSum', 'MultiDocSum', 'MDSTopicQ', 'MDSTopicKV', 'MDSTopicKVS', 'MDSGAT'])
+                        choices=['GraphSum', 'MDS', 'MDSTopicQ', 'MDSTopicKV', 'MDSTopicKVS', 'MTSP'])
     parser.add_argument('--initializer_range', default=0.02, type=int,
                         help='The standard deviation (std) of model normal initializer')
     parser.add_argument('--weight_sharing', default=True, type=str2bool,

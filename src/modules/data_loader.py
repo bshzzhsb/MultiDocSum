@@ -389,7 +389,7 @@ class DataIterator(object):
         for buffer in self.batch_buffer(data, self.batch_size * 100):
             if self.args.mode != 'train':
                 p_batch = self.get_batch(
-                    sorted(sorted(buffer, key=self.primary_sort_key), key=self.secondary_sort_key),
+                    buffer,
                     self.batch_size
                 )
             else:
