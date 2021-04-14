@@ -128,9 +128,9 @@ class BeamSearch:
                 best_hyp_tuple = sorted_hyps.pop()
                 best_score = best_hyp_tuple[0]
                 best_hyp = best_hyp_tuple[1]
-                sent_lengths[n_best * i + j] = len(best_hyp)
+                sent_lengths[n_best * i + j] = len(best_hyp) - 1
 
-                best.append(best_hyp)
+                best.append(best_hyp[1:])
                 best_scores[n_best * i + j] = best_score
 
         sent_max_len = min(sent_lengths.max().item() + 1, self.max_length)

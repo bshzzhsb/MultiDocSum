@@ -304,7 +304,7 @@ class Translator(object):
             vocab_size = next_token_scores.size(-1)
             next_token_scores = next_token_scores.view(-1, beam_size * vocab_size)
             # [batch_size, 2 * beam_size]
-            next_token_scores, next_tokens = next_token_scores.topk(2 * beam_size, dim=-1)
+            next_token_scores, next_tokens = next_token_scores.topk(beam_size * beam_size, dim=-1)
             next_indices = next_tokens // vocab_size
             next_tokens = next_tokens % vocab_size
 
