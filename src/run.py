@@ -11,6 +11,7 @@ from models.model_builder import MultiDocSum, init_params
 from model_topic_q.model_builder import MDSTopicQ
 from model_topic_kv.model_builder import MDSTopicKV
 from model_topic_kvs.model_builder import MDSTopicKVS
+from model_mt_sp.model_builder import MDSTopicSP
 from modules.optimizer import build_optim
 from models.trainer_builder import build_trainer
 from models.predictor_builder import build_predictor
@@ -48,6 +49,8 @@ def get_model(symbols, spm, device, checkpoint):
         model = MDSTopicKV(args, symbols, spm, device, checkpoint)
     elif args.model == 'MDSTopicKVS':
         model = MDSTopicKVS(args, symbols, spm, device, checkpoint)
+    elif args.model == 'MTSP':
+        model = MDSTopicSP(args, symbols, spm, device, checkpoint)
     else:
         raise NotImplementedError()
 

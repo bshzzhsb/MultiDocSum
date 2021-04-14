@@ -1,26 +1,16 @@
 import torch
 import torch.nn as nn
-from torch.nn.init import normal_, constant_, xavier_uniform_
+from torch.nn.init import normal_
 
 from models.layers.encoder import TransformerEncoder, GraphEncoder
-from model_topic_kvs.neural_modules.decoder import GraphDecoder
+from model_mt_sp.neural_modules.decoder import GraphDecoder
 from models.neural_modules.neural_modules import PositionalEncoding
 
 
-def init_params(initializer_std, model: nn.Module):
-    for m in model.modules():
-        if isinstance(m, nn.Linear):
-            xavier_uniform_(m.weight)
-            if m.bias is not None:
-                constant_(m.bias, 0.0)
-        elif isinstance(m, nn.Embedding):
-            normal_(m.weight, mean=0, std=initializer_std)
-
-
-class MDSTopicKVS(nn.Module):
+class MDSTopicSP(nn.Module):
 
     def __init__(self, args, symbols, tokenizer, device, checkpoint=None):
-        super(MDSTopicKVS, self).__init__()
+        super(MDSTopicSP, self).__init__()
         self.args = args
         self.tokenizer = tokenizer
         self.vocab_size = len(tokenizer)
@@ -56,11 +46,13 @@ class MDSTopicKVS(nn.Module):
         self.enc_pos_embed = PositionalEncoding(self.embed_size // 2)
         self.dec_pos_embed = PositionalEncoding(self.embed_size)
 
-        self.topic_embed = nn.Embedding(self.vocab_size, self.embed_size, self.padding_idx)
+        self.tgt_topic_embed = nn.Embedding(self.vocab_size, self.embed_size, self.padding_idx)
+        self.para_topic_embed = nn.Embedding(self.vocab_size, self.embed_size, self.padding_idx)
 
         if self.weight_sharing:
             self.dec_embed.weight = self.enc_word_embed.weight
-            self.topic_embed.weight = self.enc_word_embed.weight
+            self.tgt_topic_embed.weight = self.enc_word_embed.weight
+            self.para_topic_embed.weight = self.enc_word_embed.weight
 
         self.transformer_encoder = TransformerEncoder(
             n_layers=self.enc_word_layers,
@@ -164,8 +156,8 @@ class MDSTopicKVS(nn.Module):
         return enc_words_out, enc_sents_out
 
     def decode(self, dec_input, enc_words_out, enc_sents_out, state=None):
-        tgt_word, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias, \
-            tgt_src_sents_attn_bias, graph_attn_bias, tgt_topic, tgt_topic_attn_bias = dec_input[:8]
+        tgt_word, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias, tgt_src_sents_attn_bias,\
+            graph_attn_bias, tgt_topic, tgt_topic_attn_bias, para_topic, para_topic_attn_bias = dec_input
 
         # [batch_size, tgt_len, d_model]
         embed_out = self.dec_embed(tgt_word)
@@ -178,13 +170,15 @@ class MDSTopicKVS(nn.Module):
         embed_out = embed_out + pos_embed_out
         embed_out = self.dec_embed_dropout(embed_out)
 
-        topic_embed_out = self.topic_embed(tgt_topic)
+        tgt_topic_embed_out = self.tgt_topic_embed(tgt_topic)
+        para_topic_embed_out = self.para_topic_embed(para_topic)
 
         # [batch_size, tgt_len, d_model]
         dec_output = self.graph_decoder(
             embed_out, enc_words_out, enc_sents_out, tgt_self_attn_bias,
             tgt_src_words_attn_bias, tgt_src_sents_attn_bias, graph_attn_bias,
-            topic_embed_out, tgt_topic_attn_bias, state=state
+            tgt_topic_embed_out, tgt_topic_attn_bias, para_topic_embed_out, para_topic_attn_bias,
+            state=state
         )
 
         # [batch_size * tgt_len, d_model]

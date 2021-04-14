@@ -93,16 +93,19 @@ class DataBatch(object):
         tgt_label = tgt_label.view(-1, 1)
         label_weight = label_weight.view(-1, 1)
 
-        tgt_topic, tgt_topic_attn_bias = self._pad_tgt_topic_batch_data(
-            [inst[5] for inst in data]
+        tgt_topic, tgt_topic_attn_bias, para_topic, para_topic_attn_bias = self._pad_topic_batch_data(
+            tgt_topic_insts=[inst[5] for inst in data],
+            para_topic_insts=[inst[6] for inst in data]
         )
         tgt_topic_attn_bias = tgt_topic_attn_bias.unsqueeze(1).unsqueeze(2)\
             .expand(-1, self.n_heads, self.max_tgt_len, -1)
+        para_topic_attn_bias = para_topic_attn_bias.unsqueeze(1).expand(-1, self.n_heads, -1, -1)
 
         enc_input = (src_words, src_words_pos, src_sents_pos, src_words_self_attn_bias,
                      src_sents_self_attn_bias, graph_attn_bias)
         dec_input = (tgt_words, tgt_pos, tgt_self_attn_bias, tgt_src_words_attn_bias,
-                     tgt_src_sents_attn_bias, graph_attn_bias, tgt_topic, tgt_topic_attn_bias)
+                     tgt_src_sents_attn_bias, graph_attn_bias, tgt_topic, tgt_topic_attn_bias,
+                     para_topic, para_topic_attn_bias)
 
         return enc_input, dec_input, tgt_label, label_weight
 
@@ -190,16 +193,26 @@ class DataBatch(object):
 
         return [tgt_label, label_weight]
 
-    def _pad_tgt_topic_batch_data(self, insts):
+    def _pad_topic_batch_data(self, tgt_topic_insts, para_topic_insts):
         tgt_topic = [inst + [self.pad_idx] * (self.n_topic_words - len(inst))
-                     for inst in insts]
+                     for inst in tgt_topic_insts]
         tgt_topic = torch.tensor(tgt_topic, dtype=torch.int64, device=self.device)
 
         tgt_topic_attn_bias = [[0.0] * len(inst) + [-1e18] * (self.n_topic_words - len(inst))
-                               for inst in insts]
+                               for inst in tgt_topic_insts]
         tgt_topic_attn_bias = torch.tensor(tgt_topic_attn_bias, dtype=torch.float, device=self.device)
 
-        return tgt_topic, tgt_topic_attn_bias
+        para_topic = [inst + [self.pad_idx] * (self.max_para_num - len(inst))
+                      for inst in para_topic_insts]
+        para_topic = torch.tensor(para_topic, dtype=torch.int64, device=self.device)
+
+        para_topic_attn_bias = [[[0.0] * len(tgt_topic_inst) + [-1e18] * (self.n_topic_words - len(tgt_topic_inst))]
+                                * len(para_topic_inst) +
+                                [[-1e18] * self.n_topic_words] * (self.max_para_num - len(para_topic_inst))
+                                for (para_topic_inst, tgt_topic_inst) in zip(para_topic_insts, tgt_topic_insts)]
+        para_topic_attn_bias = torch.tensor(para_topic_attn_bias, dtype=torch.float, device=self.device)
+
+        return tgt_topic, tgt_topic_attn_bias, para_topic, para_topic_attn_bias
 
 
 def load_dataset(args, phase, shuffle):
@@ -321,8 +334,8 @@ class DataIterator(object):
         return xs
 
     def preprocess(self, ex):
-        src, tgt, tgt_str, graph, tgt_topic = \
-            ex['src'], ex['tgt'], ex['tgt_str'], ex['sim_graph'], ex['tgt_topic']
+        src, tgt, tgt_str, graph, tgt_topic, para_topic = \
+            ex['src'], ex['tgt'], ex['tgt_str'], ex['sim_graph'], ex['tgt_topic'], ex['src_topic']
 
         src = src[:self.max_para_num]
         src = [para[:self.max_para_len] for para in src]
@@ -339,7 +352,7 @@ class DataIterator(object):
         else:
             tgt_topic = [topic[0] for topic in tgt_topic][:self.min_topic_words]
 
-        return src, tgt_ids, label_ids, tgt_str, graph, tgt_topic
+        return src, tgt_ids, label_ids, tgt_str, graph, tgt_topic, para_topic
 
     def simple_batch_size_fn(self, new, count):
         src, tgt = new[0], new[1]
