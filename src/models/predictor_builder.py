@@ -8,6 +8,7 @@ from utils.logger import logger
 from utils.tensor_util import tile
 from modules.data_loader import get_num_examples
 from utils.cal_rouge import rouge_results_to_str, test_rouge
+from utils.beam_search import BeamSearch
 
 
 def build_predictor(args, tokenizer, symbols, model, device):
@@ -30,6 +31,7 @@ class Translator(object):
 
         self.bos_idx = symbols['BOS']
         self.eos_idx = symbols['EOS']
+        self.pad_idx = symbols['PAD']
         self.space_idx = symbols['SPACE']
 
         self.beam_size = self.args.beam_size
@@ -64,7 +66,7 @@ class Translator(object):
             total = math.ceil(get_num_examples(self.args.data_path, self.args.mode) / self.batch_size)
             for batch in tqdm(test_iter, total=total):
                 self.batch_size = batch.batch_size
-                batch_data = self.translate_batch(batch, self.n_best)
+                batch_data = self.translate_b(batch, self.n_best)
 
                 translations = self.from_batch(batch_data)
                 for translation in translations:
@@ -156,45 +158,49 @@ class Translator(object):
 
             # [batch_size * beam_size, vocab_size]
             logits = self.model.decode(dec_input, enc_words_output, enc_sents_output, dec_state)
-            vocab_size = logits.size(-1)
 
             if step < self.min_out_len:
                 logits[:, self.eos_idx] = -1e20
 
+            # 第一次：从每个 beam 中选取 topk 个候选，相当于每个 batch 有 beam_size * beam_size 个候选
             # [batch_size * beam_size, beam_size]
-            topk_scores, topk_indices = logits.topk(beam_size, dim=-1)
+            topk_vocab_scores, topk_vocab_indices = logits.topk(beam_size, dim=-1)
 
             if self.blocking_trigram:
                 expand_alive_seq = alive_seq.unsqueeze(1).expand(-1, beam_size, -1)
                 # [batch_size * beam_size, beam_size, step + 1]
-                candi_seqs = torch.cat([expand_alive_seq, topk_indices.unsqueeze(-1)], dim=-1)
+                candi_seqs = torch.cat([expand_alive_seq, topk_vocab_indices.unsqueeze(-1)], dim=-1)
                 # [batch_size * beam_size, beam_size]
                 mask_block_trigram = self.block_trigram(candi_seqs)
                 # [batch_size * beam_size, beam_size]
                 pre_scores = topk_log_probs.view(-1).unsqueeze(-1) + mask_block_trigram
 
-            topk_scores = topk_scores + pre_scores
+            topk_vocab_scores = topk_vocab_scores + pre_scores
             length_penalty = ((5.0 + (step + 1)) / 6.0) ** self.length_penalty
             # [batch_size * beam_size, beam_size]
-            cur_scores = topk_scores / length_penalty
+            cur_scores = topk_vocab_scores / length_penalty
 
             # 将第一维变成 batch_size，来从每个 batch 的所有 beam 中选择最优的 topk 个
+            # [batch_size, beam_size * beam_size]
             cur_scores = cur_scores.view(-1, beam_size * beam_size)
+            topk_vocab_indices = topk_vocab_indices.view(-1, beam_size * beam_size)
+
+            # 第二次：从每个 batch 的 beam_size * beam_size 个候选里，选取最好的 beam_size 个
             # [batch_size, beam_size]
-            topk_scores, topk_ids = cur_scores.topk(beam_size, dim=-1)
+            topk_scores, topk_indices = cur_scores.topk(beam_size, dim=-1)
 
             topk_log_probs = topk_scores * length_penalty
 
             # 在哪个 beam 里面 [batch_size, beam_size]
-            topk_beam_index = topk_ids.div(beam_size).to(torch.int64)
-            # 在该 beam 的第几个
-            topk_ids = topk_ids.fmod(beam_size)
+            topk_beam_index = topk_indices.div(beam_size).to(torch.int64)
+
+            # 更新 topk_indices
+            # [batch_size, beam_size]
+            topk_ids = topk_vocab_indices.gather(1, topk_indices)
 
             # 在 batch * beam 中的序号 [batch_size, beam_size]
             batch_index = (topk_beam_index + beam_offset[:topk_beam_index.size(0)].unsqueeze(1))
             select_indices = batch_index.view(-1)
-            # [batch_size * beam_size]
-            topk_ids = topk_indices[select_indices, topk_ids.view(-1)]
 
             alive_seq = torch.cat([alive_seq.index_select(0, select_indices), topk_ids.view(-1, 1)], -1)
 
@@ -245,6 +251,97 @@ class Translator(object):
 
         return results
 
+    def translate_b(self, batch, n_best=1):
+        batch_size, beam_size = self.batch_size, self.beam_size
+
+        enc_input, dec_input = batch.enc_input, batch.dec_input
+        _, _, _, src_words_self_attn_bias, src_sents_self_attn_bias, graph_attn_bias = enc_input
+        tgt_topic, tgt_topic_attn_bias = dec_input[6:]
+        tgt_topic = tile(tgt_topic, beam_size, 0)
+        tgt_topic_attn_bias = tile(tgt_topic_attn_bias[:, :, 0].unsqueeze(2), beam_size, 0)
+
+        # [batch_size, max_para_num, n_heads, 1, max_para_len]
+        tgt_src_words_attn_bias = src_words_self_attn_bias[:, :, :, 0].unsqueeze(3)
+        tgt_src_words_attn_bias.requires_grad = False
+        # [batch_size, n_heads, 1, max_para_num]
+        tgt_src_sents_attn_bias = src_sents_self_attn_bias[:, :, 0].unsqueeze(2)
+        tgt_src_sents_attn_bias.requires_grad = False
+
+        # 拿到 encoder 的输出，并展开 beam_size 维度
+        enc_words_output, enc_sents_output = self.model.encode(enc_input)
+        enc_words_output = tile(enc_words_output, beam_size, 0)
+        enc_sents_output = tile(enc_sents_output, beam_size, 0)
+
+        dec_state = self.model.graph_decoder.init_decoder_state(with_cache=True)
+
+        alive_seq = torch.full([batch_size * beam_size, 1], self.bos_idx, dtype=torch.int64, device=self.device)
+        batch_beam_size, cur_len = alive_seq.size()
+
+        beam_scores = torch.zeros([batch_size, beam_size], dtype=torch.float, device=self.device)
+        beam_scores[:, 1:] = -1e20
+        beam_scores = beam_scores.view(-1)
+
+        # [batch_size * beam_size, 1]
+        pre_src_words_attn_bias = tile(tgt_src_words_attn_bias, beam_size, 0)
+        pre_src_sents_attn_bias = tile(tgt_src_sents_attn_bias, beam_size, 0)
+        pre_graph_attn_bias = tile(graph_attn_bias, beam_size, 0)
+
+        beam_search = BeamSearch(batch_size, self.max_out_len, beam_size, n_best, self.length_penalty, self.device)
+
+        while cur_len < self.max_out_len:
+            pre_ids = alive_seq[:, -1].view(-1, 1)
+            pre_pos = torch.full_like(pre_ids, cur_len - 1, dtype=torch.int64, device=self.device)
+
+            dec_input = (pre_ids, pre_pos, None, pre_src_words_attn_bias,
+                         pre_src_sents_attn_bias, pre_graph_attn_bias, tgt_topic, tgt_topic_attn_bias)
+
+            # [batch_size * beam_size, vocab_size]
+            next_token_scores = self.model.decode(dec_input, enc_words_output, enc_sents_output, dec_state)
+            if cur_len < self.min_out_len:
+                next_token_scores[:, self.eos_idx] = -1e20
+            next_token_scores = next_token_scores + beam_scores.unsqueeze(-1).expand_as(next_token_scores)
+
+            vocab_size = next_token_scores.size(-1)
+            next_token_scores = next_token_scores.view(-1, beam_size * vocab_size)
+            # [batch_size, 2 * beam_size]
+            next_token_scores, next_tokens = next_token_scores.topk(2 * beam_size, dim=-1)
+            next_indices = next_tokens // vocab_size
+            next_tokens = next_tokens % vocab_size
+
+            if self.blocking_trigram:
+                # [batch_size, 2 * beam_size, cur_len]
+                expand_alive_seq = alive_seq.view(-1, beam_size, cur_len).gather(1, next_indices.unsqueeze(-1).expand(-1, -1, cur_len))
+                # [batch_size, 2 * beam_size, cur_len + 1]
+                candi_seqs = torch.cat([expand_alive_seq, next_tokens.unsqueeze(-1)], dim=-1)
+                # [batch_size, 2 * beam_size]
+                mask_block_trigram = self.block_trigram(candi_seqs)
+                # [batch_size, 2 * beam_size]
+                next_token_scores = next_token_scores + mask_block_trigram
+
+            beam_outputs = beam_search.process(
+                alive_seq, next_token_scores, next_tokens, next_indices,
+                self.pad_idx, self.eos_idx
+            )
+            beam_scores, beam_next_tokens, beam_indices = \
+                beam_outputs['next_beam_scores'], beam_outputs['next_beam_tokens'], beam_outputs['next_beam_indices']
+
+            alive_seq = torch.cat([alive_seq[beam_indices, :], beam_next_tokens.unsqueeze(-1)], dim=-1)
+
+            cur_len += 1
+            dec_state.map_batch_fn(lambda state, dim: state.index_select(dim, beam_indices))
+
+            if beam_search.is_done:
+                break
+
+        sequence_outputs = beam_search.finalize(alive_seq, beam_scores, self.pad_idx, self.eos_idx)
+        results = {
+            'predictions': sequence_outputs['sequences'],
+            'scores': sequence_outputs['sequence_scores'],
+            'gold_score': [0] * batch_size,
+            'batch': batch
+        }
+        return results
+
     def from_batch(self, translation_batch):
         batch = translation_batch['batch']
         assert len(translation_batch['gold_score']) == len(translation_batch['predictions'])
@@ -285,7 +382,7 @@ class Translator(object):
         logger.info('Calculating Rouge')
         candidates = open(candi_path, encoding='utf-8')
         references = open(gold_path, encoding='utf-8')
-        result_dict = test_rouge(candidates, references, 1)
+        result_dict = test_rouge(candidates, references, 8)
         return result_dict
 
     def block_trigram(self, candi_seq):
