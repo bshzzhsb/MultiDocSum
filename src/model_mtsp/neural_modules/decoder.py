@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from models.neural_modules.attention import MultiHeadAttention
-from model_mt_sp.neural_modules.attention import MultiHeadHierarchicalAttention
+from model_mtsp.neural_modules.attention import MultiHeadHierarchicalAttention
 from models.neural_modules.neural_modules import PositionwiseFeedForward
 
 
@@ -41,9 +41,18 @@ class GraphDecoderLayer(nn.Module):
         tgt_topic = self.layer_norm_2(tgt_topic)
         para_topic = self.layer_norm_3(para_topic)
         # 在这进行 cache
-        # [batch_size, n_paras, d_model]
-        pt_attn = self.para_tgt_attn(para_topic, tgt_topic, tgt_topic, para_topic_attn_bias,
-                                     cache=cache, type='context')
+
+        if cache is not None:
+            if cache['pt_attn'] is not None:
+                pt_attn = cache['pt_attn']
+            else:
+                # [batch_size, n_paras, d_model]
+                pt_attn = self.para_tgt_attn(para_topic, tgt_topic, tgt_topic, para_topic_attn_bias,
+                                             type='context')
+                cache['pt_attn'] = pt_attn
+        else:
+            pt_attn = self.para_tgt_attn(para_topic, tgt_topic, tgt_topic, para_topic_attn_bias,
+                                         type='context')
 
         q = self.layer_norm_4(self_attn_output)
         # [batch_size, tgt_len, d_model]
@@ -122,7 +131,8 @@ class GraphDecoderState(object):
                 'static_k_word': None,
                 'static_v_word': None,
                 'memory_k_topic': None,
-                'memory_v_topic': None
+                'memory_v_topic': None,
+                'pt_attn': None
             }
             self.cache['layer_{}'.format(layer)] = layer_cache
 

@@ -11,7 +11,7 @@ from models.model_builder import MultiDocSum, init_params
 from model_topic_q.model_builder import MDSTopicQ
 from model_topic_kv.model_builder import MDSTopicKV
 from model_topic_kvs.model_builder import MDSTopicKVS
-from model_mt_sp.model_builder import MDSTopicSP
+from model_mtsp.model_builder import MDSTopicSP
 from modules.optimizer import build_optim
 from models.trainer_builder import build_trainer
 from models.predictor_builder import build_predictor
@@ -37,7 +37,7 @@ def main():
         test(device)
 
 
-def get_model(symbols, spm, device, checkpoint):
+def get_model(args, symbols, spm, device, checkpoint):
     if args.model == 'GraphSum':
         model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
     elif args.model == 'MDS':
@@ -57,9 +57,9 @@ def get_model(symbols, spm, device, checkpoint):
     return model
 
 
-def get_spm():
+def get_spm(vocab_path):
     spm = sentencepiece.SentencePieceProcessor()
-    spm.Load(args.vocab_path)
+    spm.Load(vocab_path)
     # <UNK>: 0, <T>: 3, <S>: 4, </S>: 5, <PAD>: 6, <P>: 7, <Q>: 8
     symbols = {'BOS': spm.PieceToId('<S>'), 'EOS': spm.PieceToId('</S>'),
                'PAD': spm.PieceToId('<PAD>'), 'EOT': spm.PieceToId('<T>'),
@@ -82,7 +82,7 @@ def train(device):
     else:
         checkpoint = None
 
-    spm, symbols = get_spm()
+    spm, symbols = get_spm(args.vocab_path)
     vocab_size = len(spm)
 
     def train_iter_fct():
@@ -93,7 +93,7 @@ def train(device):
         return DataLoader(args, load_dataset(args, 'test', shuffle=False), symbols,
                           args.batch_size, device, shuffle=False, is_test=True)
 
-    model = get_model(symbols, spm, device, checkpoint)
+    model = get_model(args, symbols, spm, device, checkpoint)
 
     # init = partial(init_params, args.initializer_range)
     # model.apply(init)
@@ -116,9 +116,9 @@ def test(device):
     logger.info('Loading checkpoint from %s' % args.checkpoint)
     checkpoint = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
 
-    spm, symbols = get_spm()
+    spm, symbols = get_spm(args.vocab_path)
 
-    model = get_model(symbols, spm, device, checkpoint)
+    model = get_model(args, symbols, spm, device, checkpoint)
     model.eval()
 
     test_iter = DataLoader(args, load_dataset(args, 'test', shuffle=False), symbols,

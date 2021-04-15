@@ -66,7 +66,7 @@ class Translator(object):
             total = math.ceil(get_num_examples(self.args.data_path, self.args.mode) / self.batch_size)
             for batch in tqdm(test_iter, total=total):
                 self.batch_size = batch.batch_size
-                batch_data = self.translate_b(batch, self.n_best)
+                batch_data = self.translate_batch(batch, self.n_best)
 
                 translations = self.from_batch(batch_data)
                 for translation in translations:
@@ -97,6 +97,7 @@ class Translator(object):
 
         if step != -1 and self.args.report_rouge:
             rouges = self._report_rouge(gold_path, candi_path)
+            logger.info(rouges)
             logger.info('Rouges at step %d \n %s' % (step, rouge_results_to_str(rouges)))
             if self.writer is not None:
                 self.writer.add_scalar('test/rouge1-F', rouges['rouge_1_f_score'], step)
@@ -109,9 +110,11 @@ class Translator(object):
 
         enc_input, dec_input = batch.enc_input, batch.dec_input
         _, _, _, src_words_self_attn_bias, src_sents_self_attn_bias, graph_attn_bias = enc_input
-        tgt_topic, tgt_topic_attn_bias = dec_input[6:]
+        tgt_topic, tgt_topic_attn_bias, para_topic, para_topic_attn_bias = dec_input[6:]
         tgt_topic = tile(tgt_topic, beam_size, 0)
         tgt_topic_attn_bias = tile(tgt_topic_attn_bias[:, :, 0].unsqueeze(2), beam_size, 0)
+        para_topic = tile(para_topic, beam_size, 0)
+        para_topic_attn_bias = tile(para_topic_attn_bias, beam_size, 0)
 
         # [batch_size, max_para_num, n_heads, 1, max_para_len]
         tgt_src_words_attn_bias = src_words_self_attn_bias[:, :, :, 0].unsqueeze(3)
@@ -153,8 +156,8 @@ class Translator(object):
             pre_pos = torch.full_like(pre_ids, step, dtype=torch.int64, device=self.device)
             pre_scores = topk_log_probs
 
-            dec_input = (pre_ids, pre_pos, None, pre_src_words_attn_bias,
-                         pre_src_sents_attn_bias, pre_graph_attn_bias, tgt_topic, tgt_topic_attn_bias)
+            dec_input = (pre_ids, pre_pos, None, pre_src_words_attn_bias, pre_src_sents_attn_bias,
+                         pre_graph_attn_bias, tgt_topic, tgt_topic_attn_bias, para_topic, para_topic_attn_bias)
 
             # [batch_size * beam_size, vocab_size]
             logits = self.model.decode(dec_input, enc_words_output, enc_sents_output, dec_state)
@@ -256,7 +259,7 @@ class Translator(object):
 
         enc_input, dec_input = batch.enc_input, batch.dec_input
         _, _, _, src_words_self_attn_bias, src_sents_self_attn_bias, graph_attn_bias = enc_input
-        tgt_topic, tgt_topic_attn_bias = dec_input[6:]
+        tgt_topic, tgt_topic_attn_bias = dec_input[6:8]
         tgt_topic = tile(tgt_topic, beam_size, 0)
         tgt_topic_attn_bias = tile(tgt_topic_attn_bias[:, :, 0].unsqueeze(2), beam_size, 0)
 

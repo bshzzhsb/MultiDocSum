@@ -15,13 +15,13 @@ def chunks(l, n):
 
 class DataBatch(object):
 
-    def __init__(self, args, data=None, pad_idx=None, device=None, is_test=False):
-        self.args = args
-        self.n_heads = self.args.n_heads
-        self.max_para_num = self.args.max_para_num
-        self.max_para_len = self.args.max_para_len
-        self.max_tgt_len = self.args.max_tgt_len
-        self.n_topic_words = self.args.num_topic_words
+    def __init__(self, n_heads, max_para_num, max_para_len, max_tgt_len, n_topic_words,
+                 data=None, pad_idx=None, device=None, is_test=False):
+        self.n_heads = n_heads
+        self.max_para_num = max_para_num
+        self.max_para_len = max_para_len
+        self.max_tgt_len = max_tgt_len
+        self.n_topic_words = n_topic_words
         self.pad_idx = pad_idx
         self.device = device
 
@@ -428,7 +428,9 @@ class DataIterator(object):
                     continue
                 self.iterations += 1
                 self._iterations_this_epoch += 1
-                batch = DataBatch(self.args, mini_batch, self.symbols['PAD'], self.device, self.is_test)
+                batch = DataBatch(self.args.n_heads, self.args.max_para_num, self.args.max_para_len,
+                                  self.args.max_tgt_len, self.args.num_topic_words,
+                                  mini_batch, self.symbols['PAD'], self.device, self.is_test)
 
                 yield batch
             return
