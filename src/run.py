@@ -3,13 +3,9 @@ import argparse
 import random
 import sentencepiece
 import os
-from functools import partial
 
 from modules.data_loader import DataLoader, load_dataset
-from graph_sum.model import GraphSum
-from models.model_builder import MultiDocSum, init_params
-from model_topic_q.model_builder import MDSTopicQ
-from model_topic_kv.model_builder import MDSTopicKV
+from models.model_builder import MultiDocSum
 from model_topic_kvs.model_builder import MDSTopicKVS
 from model_mtsp.model_builder import MDSTopicSP
 from modules.optimizer import build_optim
@@ -38,15 +34,8 @@ def main():
 
 
 def get_model(args, symbols, spm, device, checkpoint):
-    if args.model == 'GraphSum':
-        model = GraphSum(args, symbols['PAD'], symbols['BOS'], symbols['EOS'], spm, device, checkpoint)
-    elif args.model == 'MDS':
+    if args.model == 'MDS':
         model = MultiDocSum(args, symbols, spm, device, checkpoint)
-    elif args.model == 'MDSTopicQ':
-        logger.warning('MDSTopicQ is deprecated!!!')
-        model = MDSTopicQ(args, symbols, spm, device, checkpoint)
-    elif args.model == 'MDSTopicKV':
-        model = MDSTopicKV(args, symbols, spm, device, checkpoint)
     elif args.model == 'MDSTopicKVS':
         model = MDSTopicKVS(args, symbols, spm, device, checkpoint)
     elif args.model == 'MTSP':
@@ -160,7 +149,7 @@ if __name__ == '__main__':
 
     # model-related arguments
     parser.add_argument('--model', default='MultiDocSum', type=str, help='The model to use',
-                        choices=['GraphSum', 'MDS', 'MDSTopicQ', 'MDSTopicKV', 'MDSTopicKVS', 'MTSP'])
+                        choices=['MDS', 'MDSTopicKVS', 'MTSP'])
     parser.add_argument('--initializer_range', default=0.02, type=int,
                         help='The standard deviation (std) of model normal initializer')
     parser.add_argument('--weight_sharing', default=True, type=str2bool,

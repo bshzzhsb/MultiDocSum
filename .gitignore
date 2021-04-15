@@ -11,3 +11,6 @@ __pycache__/
 
 # result
 /results
+
+# test
+test.py
