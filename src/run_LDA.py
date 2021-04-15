@@ -181,15 +181,14 @@ def predict(spm):
 
     with open(args.data_path + '/test/MultiNews.30.test.1.json') as file:
         dataset = json.load(file)
-        with open('../results/prodlda/topics1.txt', 'w', encoding='utf-8') as out:
+        with open('../results/prodlda/topics.txt', 'w', encoding='utf-8') as out:
             for data in dataset:
                 # srcs = [[data['tgt_str']]]
-                srcs = [[spm.DecodeIds(src)] for src in data['src']]
-                for src in srcs:
-                    top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
-                        topic_model.get_topic(src, num_top_topic=5, num_top_word=10)
-                    out.write(str([(vocab[word], prob) for (word, prob) in zip(top_n_words, top_n_words_probs)]) + '\n')
-                    out.write(src[0] + '\n')
+                srcs = [spm.DecodeIds(src) for src in data['src']]
+                top_n_words, top_n_words_probs = \
+                    topic_model.get_srcs_topic_words(srcs, n_topic_words=10)
+                out.write(str([(vocab[word], prob) for (word, prob) in zip(top_n_words, top_n_words_probs)]) + '\n')
+                out.write(srcs[0] + '\n')
 
 
 def preprocess(spm):
@@ -215,8 +214,8 @@ def preprocess(spm):
                 if args.source == 'tgt':
                     for i, item in enumerate(data):
                         tgt = [item['tgt_str']]
-                        top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs = \
-                            topic_model.get_topic(tgt, num_top_topic=5, num_top_word=10)
+                        top_n_words, top_n_words_probs = \
+                            topic_model.get_topic_words(tgt, n_topic_words=10)
                         top_n_words = [vocab[idx] for idx in top_n_words]
                         top_n_words_ids = [idx[0] for idx in spm.Encode(top_n_words)]
                         data[i]['tgt_topic'] = [(word_id, prob)
@@ -226,8 +225,8 @@ def preprocess(spm):
                         data[i]['src_topic'] = []
                         for j, src in enumerate(item['src']):
                             src = [spm.DecodeIds(src)]
-                            _, _, top_n_words, top_n_words_probs = \
-                                topic_model.get_topic(src, num_top_topic=5, num_top_word=1)
+                            top_n_words, top_n_words_probs = \
+                                topic_model.get_topic_words(src, n_topic_words=1)
                             top_n_words = [vocab[idx] for idx in top_n_words]
                             top_n_words_ids = [idx[0] for idx in spm.Encode(top_n_words)]
                             data[i]['src_topic'].append(top_n_words_ids[0])

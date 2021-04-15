@@ -25,7 +25,7 @@ class TopicModel(object):
         self.model = ProdLDA(num_topics, args.enc1_units, args.enc2_units, vocab_size, variance, dropout,
                              device, init_mult, checkpoint=checkpoint)
 
-    def get_topic(self, src, num_top_topic, num_top_word):
+    def get_topic_words(self, src, n_topic_words):
         self.model.eval()
         with torch.no_grad():
             src = self.vectorizer.transform(src).toarray()
@@ -33,9 +33,22 @@ class TopicModel(object):
             probs, _, _, _ = self.model.encode(src)
             vocab_probs = self.model.decode(probs)
 
-            top_n_words = vocab_probs[0].numpy().argsort()[: -num_top_word - 1: -1]
-            top_n_words_probs = vocab_probs[0].numpy()[top_n_words]
+            topk_scores, topk_indices = vocab_probs.topk(n_topic_words, dim=-1)
 
-            top_n_topics = probs[0].numpy().argsort()[: -num_top_topic - 1: -1]
-            top_n_topics_probs = probs[0].numpy()[top_n_topics]
-        return top_n_topics, top_n_topics_probs, top_n_words, top_n_words_probs
+            top_n_words = vocab_probs[0].cpu().numpy().argsort()[: -n_topic_words - 1: -1]
+            top_n_words_probs = vocab_probs[0].cpu().numpy()[top_n_words]
+
+        return top_n_words, top_n_words_probs
+
+    def get_srcs_topic_words(self, srcs, n_topic_words):
+        self.model.eval()
+        with torch.no_grad():
+            srcs = self.vectorizer.transform(srcs).toarray()
+            srcs = torch.tensor(srcs, dtype=torch.float32, device=self.device)
+            probs, _, _, _ = self.model.encode(srcs)
+            vocab_probs = self.model.decode(probs)
+
+            topk_scores, topk_indices = vocab_probs.sum(0).topk(n_topic_words, dim=-1)
+            topk_words = [self.vocab[index] for index in topk_indices]
+
+        return topk_scores, topk_indices, topk_words
