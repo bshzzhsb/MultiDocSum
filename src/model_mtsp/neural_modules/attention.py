@@ -124,7 +124,7 @@ class MultiHeadHierarchicalAttention(nn.Module):
             # [batch_size, n_heads, n_topic_words, dim_per_head]
             k_t, v_t = shape(k_t), shape(v_t)
         # [batch_size, n_heads, len_q, dim_per_head]
-        context_t = self.topic_attn(q_t, k_t, v_t, topic_attn_bias)
+        context_t, _ = self.topic_attn(q_t, k_t, v_t, topic_attn_bias)
 
         # [batch_size, len_q, d_model]
         context_t = unshape(context_t)

@@ -79,7 +79,7 @@ class MultiHeadAttention(nn.Module):
         q = shape(q)
 
         # [batch_size, n_heads, len_q, d_v]
-        out = self.attn(q, k, v, bias)
+        out, _ = self.attn(q, k, v, bias)
 
         # [batch_size, len_q, d_model]
         out = unshape(out)

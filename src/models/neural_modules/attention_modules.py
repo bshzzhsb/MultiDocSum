@@ -28,7 +28,7 @@ class ScaledDotProductAttention(nn.Module):
         weights = self.dropout(F.softmax(attn, dim=-1))
         # [batch_size, n_heads, len_q, dim_per_head]
         output = torch.matmul(weights, v)
-        return output
+        return output, weights
 
 
 class DotProductPooling(nn.Module):
