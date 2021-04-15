@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.init import normal_
 
 from models.layers.encoder import TransformerEncoder, GraphEncoder
-from model_mt_sp.neural_modules.decoder import GraphDecoder
+from model_mtsp.neural_modules.decoder import GraphDecoder
 from models.neural_modules.neural_modules import PositionalEncoding
 
 

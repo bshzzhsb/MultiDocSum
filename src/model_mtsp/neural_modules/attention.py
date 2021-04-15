@@ -4,7 +4,7 @@ import torch.nn as nn
 from models.neural_modules.attention_modules import \
     ScaledDotProductAttention, \
     ScaledDotProductAttentionWithSentenceNorm
-from model_mt_sp.neural_modules.attention_modules import ScaledDotProductAttentionWithParaTopic
+from model_mtsp.neural_modules.attention_modules import ScaledDotProductAttentionWithParaTopic
 
 
 class MultiHeadHierarchicalAttention(nn.Module):
