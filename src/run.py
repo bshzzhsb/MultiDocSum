@@ -8,6 +8,7 @@ from modules.data_loader import DataLoader, load_dataset
 from models.model_builder import MultiDocSum
 from model_topic_kvs.model_builder import MDSTopicKVS
 from model_mtsp.model_builder import MDSTopicSP
+from model_tpt.model_builder import MDSTPT
 from modules.optimizer import build_optim
 from models.trainer_builder import build_trainer
 from models.predictor_builder import build_predictor
@@ -40,6 +41,8 @@ def get_model(args, symbols, spm, device, checkpoint):
         model = MDSTopicKVS(args, symbols, spm, device, checkpoint)
     elif args.model == 'MTSP':
         model = MDSTopicSP(args, symbols, spm, device, checkpoint)
+    elif args.model == 'TPT':
+        model = MDSTPT(args, symbols, spm, device, checkpoint)
     else:
         raise NotImplementedError()
 
@@ -149,7 +152,7 @@ if __name__ == '__main__':
 
     # model-related arguments
     parser.add_argument('--model', default='MultiDocSum', type=str, help='The model to use',
-                        choices=['MDS', 'MDSTopicKVS', 'MTSP'])
+                        choices=['MDS', 'MDSTopicKVS', 'MTSP', 'TPT'])
     parser.add_argument('--initializer_range', default=0.02, type=int,
                         help='The standard deviation (std) of model normal initializer')
     parser.add_argument('--weight_sharing', default=True, type=str2bool,
