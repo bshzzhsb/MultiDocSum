@@ -96,13 +96,26 @@ class MultiHeadHierarchicalAttention(nn.Module):
         context_t = unshape(context_t)
         context_t = self.fc_topic(context_t)
 
-        # 计算 para topic attn
-        q_p = self.w_qs_p(topic)
-        q_p = shape(q_p)
-        k_p, v_p = self.w_ks_p(para_topic), self.w_vs_p(para_topic)
-        k_p, v_p = shape(k_p), shape(v_p)
-        # [batch_size, n_heads, n_topic_words, max_para_num]
-        _, attn_p = self.para_topic_attn(q_p, k_p, v_p, para_topic_attn_bias.transpose(2, 3))
+        if cache is not None:
+            if cache['tp_attn'] is not None:
+                attn_p = cache['tp_attn']
+            else:
+                # 计算 para topic attn
+                q_p = self.w_qs_p(topic)
+                q_p = shape(q_p)
+                k_p, v_p = self.w_ks_p(para_topic), self.w_vs_p(para_topic)
+                k_p, v_p = shape(k_p), shape(v_p)
+                # [batch_size, n_heads, n_topic_words, max_para_num]
+                _, attn_p = self.para_topic_attn(q_p, k_p, v_p, para_topic_attn_bias.transpose(2, 3))
+                cache['tp_attn'] = attn_p
+        else:
+            # 计算 para topic attn
+            q_p = self.w_qs_p(topic)
+            q_p = shape(q_p)
+            k_p, v_p = self.w_ks_p(para_topic), self.w_vs_p(para_topic)
+            k_p, v_p = shape(k_p), shape(v_p)
+            # [batch_size, n_heads, n_topic_words, max_para_num]
+            _, attn_p = self.para_topic_attn(q_p, k_p, v_p, para_topic_attn_bias.transpose(2, 3))
 
         # [batch_size, n_heads, len_q, max_para_num]
         # like softmax
