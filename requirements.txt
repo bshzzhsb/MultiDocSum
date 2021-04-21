@@ -5,3 +5,4 @@ pyrouge
 tqdm
 scikit-learn
 gensim
+flask

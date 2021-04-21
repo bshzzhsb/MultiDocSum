@@ -191,6 +191,7 @@ def predict(spm):
                 out.write(srcs[0] + '\n')
 
 
+# TODO >>> multi-predict
 def preprocess(spm):
     assert args.checkpoint is not None
 
