@@ -60,6 +60,7 @@ prodlda_vocab = get_prodlda_vocab(prodlda_vocab_file)
 prodlda = TopicModel(prodlda_vocab, device, prodlda_checkpoint_path)
 
 model = get_model(args, symbols, spm, device, checkpoint)
+model.eval()
 predictor = build_predictor(args, spm, symbols, model, device)
 data = load_dataset()
 print(len(data))

@@ -5,6 +5,7 @@ __pycache__/
 
 # log
 /log
+/server/server.log
 
 # tensorboard & model
 /models
